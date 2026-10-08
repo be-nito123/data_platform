@@ -1,0 +1,249 @@
+/* =========================================================
+   EXPLORE DATASETS — Apple-style list page
+   ========================================================= */
+
+.datasets-page .page-header {
+  padding: 56px 24px 44px;
+  border-bottom: 1px solid var(--color-border);
+  background:
+    radial-gradient(1100px 380px at 18% -12%, rgba(10, 132, 255, 0.09), transparent 62%),
+    var(--color-bg-elevated);
+}
+
+.datasets-page .page-title {
+  font-size: clamp(32px, 4vw, 44px);
+  letter-spacing: -0.03em;
+}
+
+.datasets-page .page-desc {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-text-dim);
+  max-width: 640px;
+}
+
+.datasets-page .header-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.ds-hero-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.ds-hero-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+
+.ds-hero-chip strong {
+  color: #0a84ff;
+  font-weight: 700;
+}
+
+/* Filter — segmented control */
+.ds-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: max-content;
+  max-width: 100%;
+  padding: 4px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+.ds-filter-option {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.ds-filter-option:hover {
+  color: var(--color-text);
+}
+
+.ds-filter-option.active {
+  background: var(--color-panel);
+  color: var(--color-text);
+  box-shadow:
+    inset 0 0 0 1px var(--color-border-strong),
+    0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
+/* Grid */
+.ds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.ds-card {
+  display: flex;
+  flex-direction: column;
+  padding: 22px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.ds-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(10, 132, 255, 0.55);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(10, 132, 255, 0.12);
+}
+
+.ds-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ds-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(10, 132, 255, 0.12);
+  color: #0a84ff;
+  font-size: 18px;
+}
+
+.ds-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0a84ff;
+  background: rgba(10, 132, 255, 0.1);
+  border: 1px solid rgba(10, 132, 255, 0.25);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.ds-name {
+  margin: 18px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.ds-desc {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-text-dim);
+  flex: 1;
+}
+
+.ds-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.ds-type {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  padding: 3px 9px;
+  border-radius: 6px;
+}
+
+.ds-card-foot {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ds-count {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.ds-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0a84ff;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+.ds-open:hover {
+  color: #5ab0ff;
+}
+
+.ds-empty {
+  grid-column: 1 / -1;
+  padding: 48px;
+  text-align: center;
+  color: var(--color-text-dim);
+  border: 1px dashed var(--color-border);
+  border-radius: 16px;
+}
+
+/* CTA */
+.datasets-page .cta-section {
+  background: linear-gradient(180deg, rgba(10, 132, 255, 0.05), transparent 70%), var(--color-bg-elevated);
+}
+
+.datasets-page .cta-content h2 {
+  font-size: 30px;
+  letter-spacing: -0.02em;
+}
+
+.datasets-page .btn-primary {
+  background: #007aff;
+  border-color: #007aff;
+  border-radius: 999px;
+  padding: 12px 24px;
+}
+
+.datasets-page .btn-primary:hover {
+  background: #0a84ff;
+  border-color: #0a84ff;
+}
