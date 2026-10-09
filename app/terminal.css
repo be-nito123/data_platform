@@ -817,16 +817,12 @@
   border: 1px dashed var(--color-border, #2a2d31);
 }
 
-/* ---- Date range slider ---- */
+/* Date range slider - Tradingster chartScrollbar style */
 .date-range {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
   margin-bottom: 16px;
-  padding: 14px 18px 18px;
-  background: var(--color-panel, #181b1e);
-  border: 1px solid var(--color-border, #2a2d31);
-  border-radius: 12px;
 }
 
 .date-range-head {
@@ -871,130 +867,188 @@
   white-space: nowrap;
 }
 
-.date-range-track {
-  --thumb: 14px;
+.ts-scrollbar {
+  --ts-g: 16px;
   position: relative;
-  display: flex;
-  align-items: center;
-  height: 24px;
-  touch-action: none;
-}
-
-.date-range-rail {
-  position: absolute;
-  left: calc(var(--thumb) / 2);
-  right: calc(var(--thumb) / 2);
-  height: 4px;
-  border-radius: 999px;
+  height: 40px;
   background: var(--color-bg-elevated, #1f2225);
-  box-shadow: inset 0 0 0 1px var(--color-border, #2a2d31);
+  border: 1px solid var(--color-border, #2a2d31);
+  border-radius: 6px;
+  overflow: hidden;
+  touch-action: none;
+  cursor: crosshair;
+  user-select: none;
 }
 
-.date-range-fill {
+.ts-spark {
   position: absolute;
-  height: 4px;
-  border-radius: 999px;
-  background: var(--color-blue, #007bff);
-  transition: left 0.05s ease, right 0.05s ease;
-}
-
-.date-range-input {
-  position: absolute;
-  left: 0;
+  inset: 0;
   width: 100%;
-  height: 24px;
-  margin: 0;
-  background: transparent;
-  -webkit-appearance: none;
-  appearance: none;
+  height: 100%;
   pointer-events: none;
 }
 
-.date-range-input:focus {
-  outline: none;
+.ts-spark polyline {
+  fill: none;
+  stroke: rgba(170, 170, 170, 0.55);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }
 
-.date-range-input::-webkit-slider-runnable-track {
-  height: 4px;
-  background: transparent;
+.ts-selection {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--sel-l);
+  right: var(--sel-r);
+  background: rgba(136, 136, 136, 0.28);
+  border-left: 1px solid rgba(255, 255, 255, 0.35);
+  border-right: 1px solid rgba(255, 255, 255, 0.35);
+  pointer-events: none;
 }
 
-.date-range-input::-moz-range-track {
-  height: 4px;
-  background: transparent;
+.ts-spark-selected {
+  clip-path: inset(0 var(--sel-r) 0 var(--sel-l));
 }
 
-.date-range-input::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: var(--thumb);
-  height: 22px;
-  border-radius: 6px;
-  background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.22);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.32);
-  cursor: grab;
-  pointer-events: auto;
-  transition: box-shadow 0.1s ease, transform 0.1s ease;
+.ts-spark-selected polyline {
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 1.6;
 }
 
-.date-range-input::-moz-range-thumb {
-  width: var(--thumb);
-  height: 22px;
-  border-radius: 6px;
-  background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.22);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.32);
-  cursor: grab;
-  pointer-events: auto;
-  transition: box-shadow 0.1s ease, transform 0.1s ease;
+.ts-grabber {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--ts-g);
+  background: #9aa0a6;
+  background-image: linear-gradient(
+      to right,
+      transparent 4px, rgba(0, 0, 0, 0.5) 4px, rgba(0, 0, 0, 0.5) 5px, transparent 5px
+    ),
+    linear-gradient(to right, transparent 7px, rgba(0, 0, 0, 0.5) 7px, rgba(0, 0, 0, 0.5) 8px, transparent 8px),
+    linear-gradient(to right, transparent 10px, rgba(0, 0, 0, 0.5) 10px, rgba(0, 0, 0, 0.5) 11px, transparent 11px);
+  border: 1px solid #6b7075;
+  border-radius: 4px;
+  cursor: ew-resize;
+  z-index: 2;
+  transition: background-color 0.1s ease;
 }
 
-.date-range-input:hover::-webkit-slider-thumb {
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.42);
+.ts-grabber:hover,
+.ts-grabber:active {
+  background-color: #c3c7cc;
 }
 
-.date-range-input:hover::-moz-range-thumb {
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.42);
-}
-
-.date-range-input:active::-webkit-slider-thumb {
-  cursor: grabbing;
-  transform: scale(1.06);
-}
-
-.date-range-input:active::-moz-range-thumb {
-  cursor: grabbing;
-  transform: scale(1.06);
-}
-
-.date-range-input:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-blue, #007bff) 40%, transparent), 0 1px 3px rgba(0, 0, 0, 0.32);
-}
-
-.date-range-input:focus-visible::-moz-range-thumb {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-blue, #007bff) 40%, transparent), 0 1px 3px rgba(0, 0, 0, 0.32);
-}
-
-.date-range-input-start {
+.ts-grabber:focus-visible {
+  outline: 2px solid var(--color-blue, #007bff);
+  outline-offset: 1px;
   z-index: 3;
 }
 
-.date-range-input-end {
-  z-index: 4;
+.ts-grabber-start {
+  left: var(--sel-l);
+  transform: translateX(-50%);
 }
 
-/* ---- Raw data table expand bar ---- */
+.ts-grabber-end {
+  right: var(--sel-r);
+  transform: translateX(50%);
+}
+
+.ts-periods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ts-period {
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted, #8b8f96);
+  background: transparent;
+  border: 1px solid var(--color-border, #2a2d31);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.ts-period:hover {
+  color: var(--color-text, #e8e9ea);
+  border-color: var(--color-text-dim, #6b7280);
+}
+
+.ts-period.active {
+  color: #ffffff;
+  background: var(--color-blue, #007bff);
+  border-color: var(--color-blue, #007bff);
+}
+
+.ts-period:focus-visible {
+  outline: 2px solid var(--color-blue, #007bff);
+  outline-offset: 1px;
+}
+
+/* Modal expand for raw data tables */
+.sheet-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.sheet-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+}
+
+.sheet-modal-panel {
+  position: relative;
+  width: min(1100px, 92vw);
+  height: min(88vh, 900px);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-panel, #181b1e);
+  border: 1px solid var(--color-border, #2a2d31);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+.sheet-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--color-border, #2a2d31);
+}
+
+.sheet-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Keep the inline table styling for when not expanded */
 .raw-table-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 7px 12px;
+  padding: 10px 16px;
+  background: var(--color-bg-elevated, #1f2225);
   border: 1px solid var(--color-border, #2a2d31);
-  border-bottom: none;
-  border-radius: 10px 10px 0 0;
-  background: var(--color-panel, #181b1e);
+  border-radius: 8px 8px 0 0;
 }
 
 .raw-table-title {
@@ -1008,15 +1062,15 @@
 .raw-table-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 9px;
+  gap: 8px;
+  padding: 6px 12px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.03em;
   color: var(--color-text-muted, #8b8f96);
   background: transparent;
   border: 1px solid var(--color-border, #2a2d31);
-  border-radius: 7px;
+  border-radius: 6px;
   cursor: pointer;
   transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
 }
@@ -1031,20 +1085,21 @@
   outline-offset: 1px;
 }
 
+.raw-table-toggle-text {
+  margin-right: 6px;
+}
+
 .raw-table-toggle-icon {
   transition: transform 0.18s ease;
 }
 
-.raw-data-table.expanded .raw-table-toggle-icon {
+.raw-table-toggle[aria-expanded="true"] .raw-table-toggle-icon {
   transform: rotate(90deg);
 }
 
 .raw-data-table .raw-data-table-container {
   margin-top: 0;
-  border-radius: 0 0 10px 10px;
-}
-
-.raw-data-table.expanded .raw-data-table-container {
-  max-height: calc(100vh - 200px);
-  overflow-y: auto;
+  border-radius: 0 0 8px 8px;
+  border: 1px solid var(--color-border, #2a2d31);
+  border-top: 0;
 }

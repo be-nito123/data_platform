@@ -164,6 +164,10 @@ export function TerminalClient({ initialInstrument, initialWeatherData, initialC
   );
 
   const rangeLabels = useMemo(() => filledIndices.map((i) => weatherData[i].date), [filledIndices, weatherData]);
+  const rangeValues = useMemo(
+    () => filledIndices.map((i) => weatherData[i].price).filter((v): v is number => v !== null),
+    [filledIndices, weatherData]
+  );
 
   const latestWeatherIndex = activeWeather.length - 1;
   const latestWeather = latestWeatherIndex >= 0 ? activeWeather[latestWeatherIndex] : undefined;
@@ -344,7 +348,7 @@ export function TerminalClient({ initialInstrument, initialWeatherData, initialC
         ) : (
         <>
         {activeMetric !== "cot" && filledIndices.length > 1 && (
-          <DateRangeSlider labels={rangeLabels} value={[rangeStart, rangeEnd]} onChange={setRange} />
+          <DateRangeSlider labels={rangeLabels} values={rangeValues} value={[rangeStart, rangeEnd]} onChange={setRange} />
         )}
         <div className="terminal-grid">
           <div className="chart-panel">
