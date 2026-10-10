@@ -26,8 +26,12 @@ const METRIC_ORDER: MetricDef[] = [
   { key: "historical", label: "HISTORICAL" },
 ];
 
+export function getAvailableMetrics(instrument: InstrumentConfig): MetricDef[] {
+  return METRIC_ORDER.filter((m) => !m.requires || Boolean(instrument[m.requires]));
+}
+
 export function MetricTabs({ instrument, activeMetric, onMetricChange }: MetricTabsProps) {
-  const availableMetrics = METRIC_ORDER.filter((m) => !m.requires || Boolean(instrument[m.requires]));
+  const availableMetrics = getAvailableMetrics(instrument);
 
   return (
     <nav className="metric-tabs" role="tablist" aria-label="Data metric">

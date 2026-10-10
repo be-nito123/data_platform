@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { INSTRUMENTS } from "@/lib/instruments";
 
 interface TerminalHeaderProps {
@@ -18,6 +18,25 @@ export function TerminalHeader({
   const [searchResults, setSearchResults] = useState<string[]>([]);
   const [activeResult, setActiveResult] = useState(0);
   const [time, setTime] = useState("--:--:--");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onGlobalKey = (e: KeyboardEvent) => {
+      const isSearchHotkey =
+        (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) ||
+        ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K"));
+      if (!isSearchHotkey) return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || t?.isContentEditable) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+      searchRef.current?.select();
+      setShowSearch(true);
+    };
+    window.addEventListener("keydown", onGlobalKey);
+    return () => window.removeEventListener("keydown", onGlobalKey);
+  }, []);
 
   useEffect(() => {
     const updateTime = () => setTime(new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" }));
@@ -102,6 +121,7 @@ export function TerminalHeader({
           <input
             type="text"
             className="header-search"
+            ref={searchRef}
             placeholder="Search instrument... (/) "
             value={searchQuery}
             onChange={e => { setSearchQuery(e.target.value); setShowSearch(true); }}

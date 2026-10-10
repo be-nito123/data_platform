@@ -12,6 +12,9 @@ import { OverviewChart, type OverviewMode } from "@/components/market/OverviewCh
 import { BpsChart } from "@/components/market/BpsChart";
 import { COTTable } from "@/components/market/COTTable";
 import { RawDataTable, type RawTableRow, type RawCell } from "@/components/market/RawDataTable";
+import { getAvailableMetrics } from "@/components/terminal/MetricTabs";
+import { useTerminalShortcuts } from "@/components/terminal/useTerminalShortcuts";
+import { ShortcutHelp } from "@/components/terminal/ShortcutHelp";
 import { INSTRUMENTS } from "@/lib/instruments";
 import { getCotSource } from "@/lib/supabase/data/cot";
 import { WeatherRow } from "@/lib/supabase/google/weather";
@@ -53,6 +56,8 @@ function signedPct(value: number): string {
 export function TerminalClient({ initialInstrument, initialWeatherData, initialCotData }: TerminalClientProps) {
   const [activeInstrument, setActiveInstrument] = useState(initialInstrument);
   const [activeMetric, setActiveMetric] = useState("overview");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   const [weatherData, setWeatherData] = useState<WeatherRow[]>(initialWeatherData);
   const [cotData, setCotData] = useState<CotRow[]>(initialCotData);
@@ -326,10 +331,35 @@ export function TerminalClient({ initialInstrument, initialWeatherData, initialC
 
   const cotVariant = getCotSource(activeInstrument)?.variant ?? "standard";
 
+  const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);
+  const toggleShortcuts = useCallback(() => setShortcutsOpen((v) => !v), []);
+  const refreshData = useCallback(() => fetchData(activeInstrument), [fetchData, activeInstrument]);
+  const metricKeys = useMemo(
+    () => (instrument ? getAvailableMetrics(instrument).map((m) => m.key) : []),
+    [instrument]
+  );
+
+  useTerminalShortcuts({
+    activeInstrument,
+    onInstrumentChange: setActiveInstrument,
+    metricKeys,
+    onMetricChange: setActiveMetric,
+    sidebarOpen,
+    onSidebarToggle: toggleSidebar,
+    onRefresh: refreshData,
+    helpOpen: shortcutsOpen,
+    onHelpToggle: toggleShortcuts,
+  });
+
   if (!instrument) return null;
 
   return (
-    <TerminalShell activeInstrument={activeInstrument} onInstrumentChange={setActiveInstrument}>
+    <TerminalShell
+      activeInstrument={activeInstrument}
+      onInstrumentChange={setActiveInstrument}
+      sidebarOpen={sidebarOpen}
+      onSidebarToggle={toggleSidebar}
+    >
       <div className="terminal-content" key={activeInstrument}>
         <div className="dataset-header">
             <span className="dataset-category">{instrument.category.toUpperCase()}</span>
@@ -431,6 +461,7 @@ export function TerminalClient({ initialInstrument, initialWeatherData, initialC
         </>
         )}
       </div>
+      {shortcutsOpen && <ShortcutHelp onClose={toggleShortcuts} />}
     </TerminalShell>
   );
 }

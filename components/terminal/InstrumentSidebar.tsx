@@ -77,7 +77,7 @@ export function InstrumentSidebar({
 
         <div className="sidebar-footer">
           <div className="sidebar-search-hint">
-            <kbd>/</kbd> Search instruments
+            <kbd>/</kbd> search · <kbd>[</kbd> <kbd>]</kbd> instruments · <kbd>?</kbd> help
           </div>
         </div>
       </aside>
