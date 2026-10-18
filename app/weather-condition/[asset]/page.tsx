@@ -1,9 +1,17 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getSheetData } from "@/lib/supabase/google/sheets";
 import MarketDataChart from "@/components/MarketWeatherChart";
 import SiteNav from "@/components/SiteNav";
 import SiteFooter from "@/components/SiteFooter";
+
+/* Legacy asset pages, superseded by /terminal/[instrument]. Kept out of the
+   index while their fate is undecided. */
+export const metadata: Metadata = {
+  title: "Market Conditions",
+  robots: { index: false, follow: false },
+};
 
 /* ========================================================= */
 /* SETTINGS */

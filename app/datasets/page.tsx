@@ -4,14 +4,15 @@ import { getAllInstruments } from "@/lib/instruments";
 import SiteNav from "@/components/SiteNav";
 import SiteFooter from "@/components/SiteFooter";
 import { DatasetExplorer, type DatasetItem } from "@/components/DatasetExplorer";
+import { pageMetadata } from "@/lib/site";
 import "../datasets.css";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Datasets",
   description:
     "Browse every DataVault dataset — price, volume, open interest, COT positioning and treasury yields across commodities, rates, FX, equities, crypto and intermarket ratios.",
-  alternates: { canonical: "/datasets" },
-};
+  path: "/datasets",
+});
 
 function loadDatasets(): DatasetItem[] {
   return getAllInstruments().map((inst) => ({

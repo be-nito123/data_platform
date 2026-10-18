@@ -5,12 +5,14 @@ import CombinedChart from "@/components/CombinedChart";
 import PositioningBreakdown from "@/components/PositioningBreakdown";
 import SiteNav from "@/components/SiteNav";
 import SiteFooter from "@/components/SiteFooter";
+import { pageMetadata } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "BTC COT Report",
   description:
     "Bitcoin Commitment of Traders positioning — commercial, non-commercial and net positioning history across the reported series.",
-};
+  path: "/crypto-cot-report/btc",
+});
 
 function formatNumber(value: number | null) {
   if (value === null || value === undefined) return "-";

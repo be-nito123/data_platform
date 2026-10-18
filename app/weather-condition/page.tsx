@@ -1,8 +1,26 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import DailyAccessGate from "@/components/DailyAccessGate";
 import SiteNav from "@/components/SiteNav";
 import SiteFooter from "@/components/SiteFooter";
+import { pageMetadata } from "@/lib/site";
+
+/*
+  This surface is gated behind the Daily Access paywall and is not part of the
+  public site. Keep it out of the index until a decision is made about its
+  future — if it is kept, give it a name that is not the internal codename and
+  move it into /sitemap.ts.
+*/
+export const metadata: Metadata = {
+  ...pageMetadata({
+    title: "Daily Market Data",
+    description:
+      "Daily price, volume and open interest across every market DataVault covers.",
+    path: "/weather-condition",
+  }),
+  robots: { index: false, follow: true },
+};
 
 const ASSETS = [
   {

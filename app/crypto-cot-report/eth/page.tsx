@@ -1,8 +1,17 @@
+import type { Metadata } from "next";
 import { getSheetData } from "@/lib/supabase/google/sheets";
 import { processEthRows } from "@/lib/supabase/data/eth";
 import EthCombinedChart from "@/components/EthCombinedChart";
 import SiteNav from "@/components/SiteNav";
 import SiteFooter from "@/components/SiteFooter";
+import { pageMetadata } from "@/lib/site";
+
+export const metadata: Metadata = pageMetadata({
+  title: "ETH COT Report",
+  description:
+    "Ethereum Commitment of Traders positioning — commercial, non-commercial and net positioning history across the reported series.",
+  path: "/crypto-cot-report/eth",
+});
 
 export default async function EthCotReportPage() {
   const rows = await getSheetData("COT BTC / ETH!A:U").catch(() => null);

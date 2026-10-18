@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import DocumentPage from "@/components/DocumentPage";
+import { pageMetadata } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Terms of Service",
   description:
     "The terms governing your use of the DataVault market data application, including licensing, data sources, disclaimers and liability.",
-  alternates: { canonical: "/terms" },
-};
+  path: "/terms",
+});
 
 export default function TermsPage() {
   return (

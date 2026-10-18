@@ -1,6 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import SiteNav from "@/components/SiteNav";
 import SiteFooter from "@/components/SiteFooter";
+import { pageMetadata } from "@/lib/site";
+
+export const metadata: Metadata = pageMetadata({
+  title: "Crypto COT Reports",
+  description:
+    "Commitments of Traders positioning for Bitcoin and Ethereum — commercial, non-commercial and net series in one view.",
+  path: "/crypto-cot-report",
+});
 
 export default function CryptoCotReportPage() {
   return (

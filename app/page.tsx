@@ -3,13 +3,14 @@ import Link from "next/link";
 import SiteNav from "@/components/SiteNav";
 import SiteFooter from "@/components/SiteFooter";
 import { getAllInstruments, CATEGORIES } from "@/lib/instruments";
-import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE } from "@/lib/site";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, pageMetadata } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+  socialTitle: `${SITE_NAME} — ${SITE_TAGLINE}`,
   description: SITE_DESCRIPTION,
-  alternates: { canonical: "/" },
-};
+  path: "/",
+});
 
 /* Minimal monochrome line icons (Lucide-style) */
 function Icon({ paths, size = 22 }: { paths: string[]; size?: number }) {

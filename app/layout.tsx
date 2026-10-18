@@ -22,13 +22,17 @@ export const metadata: Metadata = {
   authors: [{ name: SITE_NAME }],
   creator: SITE_NAME,
   publisher: SITE_NAME,
-  alternates: { canonical: "/" },
+  /*
+   * No `alternates` or `openGraph.url` here on purpose. Next.js shallowly
+   * merges metadata across segments, so anything set at the root leaks onto
+   * every page that does not override it — every URL would advertise "/" as
+   * its canonical. Each page builds its own via `pageMetadata()`.
+   */
   openGraph: {
     type: "website",
     siteName: SITE_NAME,
     title: `${SITE_NAME} — ${SITE_TAGLINE}`,
     description: SITE_DESCRIPTION,
-    url: "/",
   },
   twitter: {
     card: "summary_large_image",
