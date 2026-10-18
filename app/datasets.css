@@ -53,7 +53,7 @@
   font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: #0a84ff;
+  color: var(--color-accent);
 }
 
 /* Hero summary chips */
@@ -78,7 +78,7 @@
 }
 
 .ds-hero-chip strong {
-  color: #0a84ff;
+  color: var(--color-accent);
   font-weight: 700;
   font-family: var(--font-mono);
 }
@@ -225,7 +225,7 @@
   height: 40px;
   border-radius: 12px;
   background: rgba(10, 132, 255, 0.12);
-  color: #0a84ff;
+  color: var(--color-accent);
   font-size: 18px;
 }
 
@@ -238,7 +238,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #0a84ff;
+  color: var(--color-accent);
   background: rgba(10, 132, 255, 0.1);
   border: 1px solid rgba(10, 132, 255, 0.25);
   padding: 3px 10px;
@@ -307,7 +307,7 @@
   gap: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: #0a84ff;
+  color: var(--color-accent);
   text-decoration: none;
   white-space: nowrap;
   transition: color 0.15s ease;
@@ -364,8 +364,8 @@
 }
 
 .datasets-page .btn-primary:hover {
-  background: #0a84ff;
-  border-color: #0a84ff;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .datasets-page .btn-secondary {

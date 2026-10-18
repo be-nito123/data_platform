@@ -4,7 +4,7 @@
    ========================================================= */
 
 .auth-page {
-  --auth-accent: #0a84ff;
+  --auth-accent: var(--color-accent);
   --auth-accent-soft: rgba(10, 132, 255, 0.12);
   position: relative;
   display: flex;

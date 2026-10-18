@@ -111,7 +111,7 @@ export default function CryptoCotReportPage() {
           {/* ================================================= */}
 
           <Link
-            href="/test-sheets"
+            href="/crypto-cot-report/btc"
             className="
               group
               grid

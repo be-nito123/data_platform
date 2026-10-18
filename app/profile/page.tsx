@@ -1,21 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import SiteNav from "@/components/SiteNav";
+import SiteFooter from "@/components/SiteFooter";
+import { INSTRUMENTS } from "@/lib/instruments";
 
-const SAVED_DATASET_INFO: Record<string, { title: string; subtitle: string; href: string }> = {
-  XAU: { title: "Gold Market Data", subtitle: "Gold / XAUUSD", href: "/weather-condition/gold" },
-  XAG: { title: "Silver Market Data", subtitle: "Silver / XAGUSD", href: "/weather-condition/silver" },
-  BTC: { title: "Bitcoin Market Data", subtitle: "Bitcoin / BTCUSD", href: "/weather-condition/btc" },
-  OIL: { title: "Crude Oil Data", subtitle: "WTI Crude Oil", href: "/weather-condition/oil" },
-  DXY: { title: "Dollar Index Data", subtitle: "U.S. Dollar Index", href: "/weather-condition/dxy" },
-  NDX: { title: "NASDAQ 100 Data", subtitle: "NASDAQ 100 Index", href: "/datasets" },
-};
+/**
+ * Resolve a stored `saved_datasets.dataset_code` (a symbol such as "XAU")
+ * to a row in the instrument registry, so bookmarks always point at a live URL.
+ */
+function findInstrumentByCode(code: string) {
+  const normalized = code.trim().toUpperCase();
+
+  return Object.values(INSTRUMENTS).find(
+    (instrument) =>
+      instrument.symbol.toUpperCase() === normalized ||
+      instrument.id.toUpperCase() === normalized
+  );
+}
 
 export default function ProfilePage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -40,7 +49,7 @@ export default function ProfilePage() {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        window.location.assign("/login"); // eslint-disable-line
+        router.replace("/login");
         return;
       }
 
@@ -49,15 +58,12 @@ export default function ProfilePage() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select(
-          "full_name, email, country, phone_code, phone_number, company, job_title"
-        )
+        .select("full_name, country, phone_code, phone_number, company, job_title")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (profile) {
         setFullName(profile.full_name ?? "");
-        setEmail(profile.email ?? user.email ?? "");
         setCountry(profile.country ?? "");
         setPhoneCode(profile.phone_code ?? "");
         setPhoneNumber(profile.phone_number ?? "");
@@ -70,15 +76,17 @@ export default function ProfilePage() {
         .select("dataset_code")
         .eq("user_id", user.id);
 
-      if (!savedError && savedData) {
-        setSavedDatasets(savedData.map((item) => item.dataset_code));
+      if (savedError) {
+        console.error("Could not load saved datasets:", savedError.message);
+      } else if (savedData) {
+        setSavedDatasets(savedData.map((item) => item.dataset_code).filter(Boolean));
       }
 
       setLoading(false);
     }
 
     loadProfile();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [supabase, router]);
 
   async function handleSave() {
     setSaving(true);
@@ -99,12 +107,13 @@ export default function ProfilePage() {
       .eq("id", userId);
 
     if (error) {
-      setErrorMessage(error.message);
+      console.error("Profile update failed:", error.message);
+      setErrorMessage("We could not save your changes. Please try again.");
       setSaving(false);
       return;
     }
 
-    setMessage("Profile updated successfully.");
+    setMessage("Profile updated.");
     setEditMode(false);
     setSaving(false);
   }
@@ -126,153 +135,123 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#000000] text-white">
-        <div className="text-xs uppercase tracking-[0.2em] text-[#007AFF]">
-          Loading DataVault Profile...
+      <main className="flex min-h-screen items-center justify-center bg-bg">
+        <div className="font-mono text-[11px] uppercase tracking-[0.2em] text-accent">
+          Loading profile…
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#000000] text-white">
-
+    <div className="flex min-h-screen flex-col bg-bg text-text">
       <SiteNav />
 
-      {/* PAGE */}
-      <section className="mx-auto max-w-[1100px] px-5 py-12 lg:px-8">
-
-        {/* HEADER */}
-        <div className="flex flex-col justify-between gap-5 border-b border-white/[0.08] pb-7 sm:flex-row sm:items-end">
-
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-[#007AFF]">
-              Account Management
-            </div>
-
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-              Profile
-            </h1>
-
-            <p className="mt-2 text-sm text-white/40">
-              Manage your DataVault account information.
-            </p>
-          </div>
-
-          {!editMode ? (
-            <button
-              type="button"
-              onClick={() => {
-                setEditMode(true);
-                setMessage("");
-                setErrorMessage("");
-              }}
-              className="border border-[#007AFF] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[#007AFF] transition hover:bg-[#000000] hover:text-black"
-            >
-              Edit Profile
-            </button>
-          ) : (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="border border-white/10 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-white/50 transition hover:border-white/20 hover:text-white"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="border border-[#007AFF] bg-[#000000] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-black transition hover:bg-[#0A84FF] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          )}
-
-        </div>
-
-        {/* SUCCESS / ERROR */}
-        {message && (
-          <div className="mt-5 border border-[#0A84FF]/20 bg-[#007AFF]/[0.06] px-4 py-3 text-xs text-[#007AFF]">
-            {message}
-          </div>
-        )}
-
-        {errorMessage && (
-          <div className="mt-5 border border-red-400/20 bg-red-400/[0.06] px-4 py-3 text-xs text-red-300">
-            {errorMessage}
-          </div>
-        )}
-
-        {/* PROFILE HEADER CARD */}
-        <div className="mt-8 border border-white/[0.1] bg-[#1C1C1E]">
-
-          <div className="flex flex-col gap-6 p-7 sm:flex-row sm:items-center">
-
-            {/* AVATAR */}
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-[#007AFF]/50 bg-[#000000]/10 text-2xl font-semibold text-[#007AFF]">
-              {initials}
-            </div>
-
+      <main className="flex-1">
+        <section className="mx-auto max-w-[1100px] px-4 py-10 lg:px-6">
+          {/* PAGE HEADER */}
+          <div className="flex flex-col justify-between gap-5 border-b border-border pb-6 sm:flex-row sm:items-end">
             <div>
-              <div className="text-[9px] uppercase tracking-[0.18em] text-white/30">
-                Authenticated User
+              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent">
+                Account
               </div>
-
-              <h2 className="mt-1 text-2xl font-semibold">
-                {fullName || "DataVault User"}
-              </h2>
-
-              <p className="mt-1 text-xs text-white/40">
-                {email}
+              <h1 className="mt-2 text-[26px] font-semibold tracking-tight text-text">
+                Your profile
+              </h1>
+              <p className="mt-2 max-w-md text-[13px] leading-6 text-text-dim">
+                Manage the details on your DataVault account and review your saved datasets.
               </p>
             </div>
 
-            <div className="sm:ml-auto">
-              <div className="border border-[#0A84FF]/20 bg-[#007AFF]/[0.06] px-3 py-2 text-center">
-
-                <div className="text-[9px] uppercase tracking-[0.15em] text-[#0A84FF]">
-                  Account Status
-                </div>
-
-                <div className="mt-1 text-xs font-semibold text-[#007AFF]">
-                  ACTIVE
-                </div>
-
+            {editMode ? (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="rounded-lg border border-border px-4 py-2.5 text-[12px] font-semibold text-text-dim transition hover:border-border-strong hover:text-text"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="rounded-lg border border-accent bg-accent px-4 py-2.5 text-[12px] font-semibold text-white transition hover:border-accent-strong hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {saving ? "Saving…" : "Save changes"}
+                </button>
               </div>
-            </div>
-
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditMode(true);
+                  setMessage("");
+                  setErrorMessage("");
+                }}
+                className="rounded-lg border border-accent px-4 py-2.5 text-[12px] font-semibold text-accent transition hover:bg-accent hover:text-white"
+              >
+                Edit profile
+              </button>
+            )}
           </div>
-        </div>
 
-        {/* INFORMATION */}
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {message && (
+            <p
+              role="status"
+              aria-live="polite"
+              className="mt-5 rounded-lg border border-green/40 bg-green/10 px-4 py-3 text-[12px] text-green"
+            >
+              {message}
+            </p>
+          )}
 
-          {/* PERSONAL */}
-          <div className="border border-white/[0.1] bg-[#1C1C1E]">
+          {errorMessage && (
+            <p
+              role="alert"
+              className="mt-5 rounded-lg border border-red/40 bg-red/10 px-4 py-3 text-[12px] text-red"
+            >
+              {errorMessage}
+            </p>
+          )}
 
-            <div className="border-b border-white/[0.08] px-6 py-4">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-[#007AFF]">
-                Personal Information
+          {/* IDENTITY CARD */}
+          <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-panel">
+            <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-accent/50 bg-accent/10 text-xl font-semibold text-accent">
+                {initials}
+              </div>
+
+              <div className="min-w-0">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-text-muted">
+                  Signed in as
+                </div>
+                <h2 className="mt-1 truncate text-[20px] font-semibold text-text">
+                  {fullName || "DataVault user"}
+                </h2>
+                <p className="mt-1 truncate text-[12px] text-text-dim">{email}</p>
+              </div>
+
+              <div className="rounded-lg border border-border bg-bg-elevated px-4 py-2.5 text-center sm:ml-auto">
+                <div className="text-[9px] uppercase tracking-[0.15em] text-text-muted">
+                  Session
+                </div>
+                <div className="mt-1 text-[12px] font-semibold text-green">Active</div>
               </div>
             </div>
+          </div>
 
-            <div className="divide-y divide-white/[0.06]">
-
+          {/* DETAILS */}
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <InfoCard title="Personal information">
               <EditableRow
-                label="Full Name"
+                label="Full name"
                 value={fullName}
                 editing={editMode}
                 onChange={setFullName}
               />
 
-              <InfoRow
-                label="Email"
-                value={email}
-              />
+              <InfoRow label="Email" value={email} />
 
               <EditableRow
                 label="Country"
@@ -281,183 +260,166 @@ export default function ProfilePage() {
                 onChange={setCountry}
               />
 
-              <div className="flex items-center justify-between gap-6 px-6 py-4">
-
-                <span className="shrink-0 text-xs text-white/35">
-                  Phone
-                </span>
+              <div className="flex items-center justify-between gap-6 px-5 py-3.5">
+                <span className="shrink-0 text-[12px] text-text-dim">Phone</span>
 
                 {editMode ? (
-                  <div className="flex max-w-[60%] gap-2">
+                  <div className="flex max-w-[62%] gap-2">
                     <input
                       value={phoneCode}
-                      onChange={(e) => setPhoneCode(e.target.value)}
+                      onChange={(event) => setPhoneCode(event.target.value)}
                       placeholder="+91"
-                      className="w-16 border border-white/10 bg-black px-2 py-2 text-sm text-white outline-none focus:border-[#007AFF]"
+                      aria-label="Country dialling code"
+                      className="w-16 rounded-md border border-border bg-bg-elevated px-2 py-2 text-center text-[13px] text-text"
                     />
-
                     <input
                       value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      onChange={(event) => setPhoneNumber(event.target.value)}
                       placeholder="Phone number"
-                      className="w-full border border-white/10 bg-black px-3 py-2 text-sm text-white outline-none focus:border-[#007AFF]"
+                      aria-label="Phone number"
+                      inputMode="tel"
+                      className="w-full rounded-lg border border-border bg-bg-elevated px-3 py-2 text-[13px] text-text focus:border-accent"
                     />
                   </div>
                 ) : (
-                  <span className="text-right text-sm text-white/80">
-                    {phoneNumber
-                      ? `${phoneCode || ""} ${phoneNumber}`
-                      : "Not provided"}
+                  <span className="truncate text-right text-[13px] text-text">
+                    {phoneNumber ? `${phoneCode || ""} ${phoneNumber}`.trim() : "Not provided"}
                   </span>
                 )}
-
               </div>
+            </InfoCard>
 
-            </div>
-          </div>
-
-          {/* PROFESSIONAL */}
-          <div className="border border-white/[0.1] bg-[#1C1C1E]">
-
-            <div className="border-b border-white/[0.08] px-6 py-4">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-[#007AFF]">
-                Professional Information
-              </div>
-            </div>
-
-            <div className="divide-y divide-white/[0.06]">
-
+            <InfoCard title="Professional information">
               <EditableRow
-                label="Company / Organization"
+                label="Company"
                 value={company}
                 editing={editMode}
                 onChange={setCompany}
               />
 
               <EditableRow
-                label="Job Title"
+                label="Job title"
                 value={jobTitle}
                 editing={editMode}
                 onChange={setJobTitle}
               />
 
-              <InfoRow
-                label="Account Email"
-                value={email}
-              />
+              <InfoRow label="Account email" value={email} />
 
-              <InfoRow
-                label="User ID"
-                value={userId}
-                mono
-              />
-
-            </div>
+              <InfoRow label="Account ID" value={userId} mono />
+            </InfoCard>
           </div>
 
-        </div>
-        {/* SAVED DATASETS */}
-        <div className="mt-8 border border-white/[0.1] bg-[#1C1C1E]">
-          <div className="border-b border-white/[0.08] px-6 py-4">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-[#007AFF]">
-              Saved Datasets
-            </div>
-            <p className="mt-1 text-xs text-white/35">Your bookmarked market datasets.</p>
-          </div>
-
-          <div className="p-6">
-            {savedDatasets.length === 0 ? (
-              <div className="border border-dashed border-white/[0.1] px-5 py-8 text-center">
-                <div className="text-sm text-white/40">No saved datasets yet.</div>
-                <Link href="/#datasets" className="mt-3 inline-block text-[10px] uppercase tracking-[0.15em] text-[#007AFF] hover:underline">
-                  Explore Datasets →
-                </Link>
+          {/* SAVED DATASETS */}
+          <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-panel">
+            <div className="border-b border-border px-6 py-4">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-accent">
+                Saved datasets
               </div>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {savedDatasets.map((code) => {
-                  const dataset = SAVED_DATASET_INFO[code];
-                  if (!dataset) return null;
-                  return (
-                    <Link key={code} href={dataset.href} className="group border border-white/[0.1] bg-[#1C1C1E] p-4 transition hover:-translate-y-1 hover:border-[#007AFF]/50">
-                      <div className="flex items-start justify-between">
-                        <div className="flex h-9 w-9 items-center justify-center border border-white/10 bg-white/[0.03] text-[10px] font-bold text-[#007AFF]">{code}</div>
-                        <span className="text-[#007AFF]">★</span>
-                      </div>
-                      <div className="mt-5 text-sm font-semibold text-white">{dataset.title}</div>
-                      <div className="mt-1 text-[10px] text-white/30">{dataset.subtitle}</div>
-                      <div className="mt-5 border-t border-white/[0.08] pt-3 text-[10px] text-white/35 group-hover:text-[#007AFF]">OPEN TERMINAL →</div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* SECURITY */}
-<div className="mt-8 border border-white/[0.1] bg-[#1C1C1E]">
-
-  <div className="border-b border-white/[0.08] px-6 py-4">
-    <div className="text-[10px] uppercase tracking-[0.18em] text-[#007AFF]">
-      Security & Account
-    </div>
-  </div>
-
-  <div className="flex flex-col gap-5 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
-
-    <div>
-      <div className="text-sm font-semibold text-white">
-        Password
-      </div>
-
-      <p className="mt-1 max-w-xl text-xs leading-5 text-white/40">
-        Password changes are handled through a secure email verification link.
-        This keeps your account credentials protected.
-      </p>
-    </div>
-
-    <Link
-      href="/forgot-password"
-      className="shrink-0 border border-[#007AFF] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[#007AFF] transition hover:bg-[#000000] hover:text-black"
-    >
-      Reset Password
-    </Link>
-
-  </div>
-
-</div>
-
-        {/* FOOTER */}
-        <div className="mt-8 flex flex-col justify-between gap-4 rounded-2xl border-t border-white/[0.08] pt-6 sm:flex-row sm:items-center">
-
-          <div>
-            <div className="text-[9px] uppercase tracking-[0.16em] text-white/25">
-              DataVault Security
+              <p className="mt-1 text-[12px] text-text-dim">
+                Your bookmarked markets, ready to open in the terminal.
+              </p>
             </div>
 
-            <p className="mt-1 text-xs text-white/35">
-              Your account is protected by Supabase authentication.
+            <div className="p-6">
+              {savedDatasets.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border px-5 py-10 text-center">
+                  <p className="text-[13px] text-text-dim">No saved datasets yet.</p>
+                  <Link
+                    href="/datasets"
+                    className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-accent px-4 py-2 text-[12px] font-semibold text-accent transition hover:bg-accent hover:text-white"
+                  >
+                    Explore datasets
+                    <span aria-hidden="true">→</span>
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {savedDatasets.map((code) => {
+                    const instrument = findInstrumentByCode(code);
+                    if (!instrument) return null;
+
+                    return (
+                      <Link
+                        key={code}
+                        href={`/terminal/${instrument.id}`}
+                        className="group rounded-xl border border-border bg-bg-elevated p-4 transition hover:-translate-y-0.5 hover:border-accent/50"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-panel font-mono text-[10px] font-bold text-accent">
+                            {instrument.symbol}
+                          </div>
+                          <span aria-hidden="true" className="text-accent">
+                            ★
+                          </span>
+                        </div>
+
+                        <div className="mt-4 text-[13px] font-semibold text-text">
+                          {instrument.displayName}
+                        </div>
+                        <div className="mt-1 text-[10px] text-text-muted">
+                          {instrument.description}
+                        </div>
+                        <div className="mt-4 border-t border-border pt-3 text-[10px] uppercase tracking-[0.12em] text-text-muted transition group-hover:text-accent">
+                          Open terminal →
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* SECURITY */}
+          <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-panel">
+            <div className="border-b border-border px-6 py-4">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-accent">
+                Security
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-5 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-[13px] font-semibold text-text">Password</div>
+                <p className="mt-1 max-w-xl text-[12px] leading-5 text-text-dim">
+                  Password changes are handled through a secure email verification link, so your
+                  credentials are never exposed in the browser.
+                </p>
+              </div>
+
+              <Link
+                href="/forgot-password"
+                className="shrink-0 rounded-lg border border-accent px-4 py-2.5 text-[12px] font-semibold text-accent transition hover:bg-accent hover:text-white"
+              >
+                Reset password
+              </Link>
+            </div>
+          </div>
+
+          {userId && (
+            <p className="mt-6 text-center font-mono text-[10px] text-text-muted">
+              Account reference: {userId}
             </p>
-          </div>
+          )}
+        </section>
+      </main>
 
-          <Link
-            href="/"
-            className="border border-[#007AFF] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[#007AFF] transition hover:bg-[#000000] hover:text-black"
-          >
-            Return to DataVault
-          </Link>
-
-        </div>
-
-      </section>
-    </main>
+      <SiteFooter />
+    </div>
   );
 }
 
-/* =========================================================
-   EDITABLE ROW
-========================================================= */
+function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border bg-panel">
+      <div className="border-b border-border px-6 py-4">
+        <div className="text-[10px] uppercase tracking-[0.18em] text-accent">{title}</div>
+      </div>
+      <div className="divide-y divide-border">{children}</div>
+    </div>
+  );
+}
 
 function EditableRow({
   label,
@@ -472,30 +434,23 @@ function EditableRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-6 px-6 py-4">
-
-      <span className="shrink-0 text-xs text-white/35">
-        {label}
-      </span>
+      <span className="shrink-0 text-[12px] text-text-dim">{label}</span>
 
       {editing ? (
         <input
           value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-[60%] border border-white/10 bg-black px-3 py-2 text-right text-sm text-white outline-none transition focus:border-[#007AFF]"
+          onChange={(event) => onChange(event.target.value)}
+          aria-label={label}
+          className="w-[60%] rounded-lg border border-border bg-bg px-3 py-2 text-right text-[13px] text-text transition focus:border-accent"
         />
       ) : (
-        <span className="max-w-[60%] truncate text-right text-sm text-white/80">
+        <span className="max-w-[60%] truncate text-right text-[13px] text-text">
           {value || "Not provided"}
         </span>
       )}
-
     </div>
   );
 }
-
-/* =========================================================
-   INFORMATION ROW
-========================================================= */
 
 function InfoRow({
   label,
@@ -508,19 +463,14 @@ function InfoRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-6 px-6 py-4">
-
-      <span className="text-xs text-white/35">
-        {label}
-      </span>
-
+      <span className="shrink-0 text-[12px] text-text-dim">{label}</span>
       <span
-        className={`max-w-[60%] truncate text-right text-sm text-white/80 ${
- mono ? " text-[10px] text-white/30" : ""
- }`}
+        className={`max-w-[60%] truncate text-right text-text ${
+          mono ? "font-mono text-[10px] text-text-muted" : "text-[13px]"
+        }`}
       >
         {value || "Not provided"}
       </span>
-
     </div>
   );
 }

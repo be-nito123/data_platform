@@ -1,61 +1,164 @@
-import Link from "next/link";
+"use client";
 
-export default function SiteNav({
-  active,
-}: {
-  active?: "datasets" | "features" | "pricing" | "about";
-}) {
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+
+type NavKey = "datasets" | "features" | "pricing" | "about";
+
+const NAV_LINKS: { key: NavKey; label: string; href: string }[] = [
+  { key: "datasets", label: "Datasets", href: "/datasets" },
+  { key: "features", label: "Features", href: "/#features" },
+  { key: "pricing", label: "Pricing", href: "/#pricing" },
+  { key: "about", label: "About", href: "/#about" },
+];
+
+export default function SiteNav({ active }: { active?: NavKey }) {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  // Prevent the page behind the drawer from scrolling while it is open.
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
+
+  // Close on Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
+  const currentKey: NavKey | undefined =
+    active ?? (pathname?.startsWith("/datasets") ? "datasets" : undefined);
+
   return (
     <nav className="sticky top-0 z-50 border-b border-border bg-bg/95 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 py-2.5 lg:px-6">
-
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded border border-blue/40 bg-blue/10 font-mono text-xs font-bold text-blue">
+      <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-4 py-2.5 lg:px-6">
+        <Link href="/" className="flex shrink-0 items-center gap-2">
+          <span
+            aria-hidden="true"
+            className="flex h-8 w-8 items-center justify-center rounded border border-accent/40 bg-accent/10 font-mono text-xs font-bold text-accent"
+          >
             ›_
-          </div>
+          </span>
           <span className="text-lg font-semibold text-text">
-            DATA<span className="text-blue">VAULT</span>
+            DATA<span className="text-accent">VAULT</span>
           </span>
         </Link>
 
         <div className="hidden items-center gap-6 text-sm md:flex">
-          {(
-            [
-              ["datasets", "/datasets"],
-              ["features", "/#features"],
-              ["pricing", "/#pricing"],
-              ["about", "/#about"],
-            ] as const
-          ).map(([key, href]) => (
-            <Link
-              key={key}
-              href={href}
-              className={`py-1 transition ${
-                active === key
-                  ? "border-b-2 border-blue text-blue"
-                  : "text-dim hover:text-text"
-              }`}
-            >
-              {key.charAt(0).toUpperCase() + key.slice(1)}
-            </Link>
-          ))}
+          {NAV_LINKS.map((link) => {
+            const isActive = currentKey === link.key;
+            return (
+              <Link
+                key={link.key}
+                href={link.href}
+                aria-current={isActive ? "page" : undefined}
+                className={`transition ${isActive ? "text-accent" : "text-text-dim hover:text-text"}`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="hidden items-center gap-2 md:flex">
           <Link
             href="/login"
-            className="text-sm text-dim transition hover:text-text btn btn-secondary"
+            className="rounded px-3 py-2 text-sm text-text-dim transition hover:text-text"
           >
-            Login
+            Sign in
           </Link>
           <Link
             href="/register"
-            className="rounded border border-blue px-4 py-1.5 text-sm font-semibold text-blue transition hover:bg-blue hover:text-white btn btn-primary"
+            className="rounded bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-strong"
           >
-            Get Started
+            Get started
           </Link>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          aria-controls="site-mobile-nav"
+          aria-label={open ? "Close navigation menu" : "Open navigation menu"}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-border text-text-dim transition hover:border-border-strong hover:text-text md:hidden"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            {open ? (
+              <>
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </>
+            ) : (
+              <>
+                <path d="M3 6h18" />
+                <path d="M3 12h18" />
+                <path d="M3 18h18" />
+              </>
+            )}
+          </svg>
+        </button>
       </div>
+
+      {open && (
+        <div id="site-mobile-nav" className="border-t border-border bg-bg-elevated px-4 py-3 md:hidden">
+          <div className="flex flex-col">
+            {NAV_LINKS.map((link) => {
+              const isActive = currentKey === link.key;
+              return (
+                <Link
+                  key={link.key}
+                  href={link.href}
+                  aria-current={isActive ? "page" : undefined}
+                  onClick={() => setOpen(false)}
+                  className={`border-b border-border/60 py-3 text-sm transition last:border-b-0 ${
+                    isActive ? "text-accent" : "text-text-dim hover:text-text"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Link
+              href="/login"
+              onClick={() => setOpen(false)}
+              className="rounded border border-border px-4 py-2.5 text-center text-sm text-text-dim transition hover:border-border-strong hover:text-text"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/register"
+              onClick={() => setOpen(false)}
+              className="rounded bg-accent px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-accent-strong"
+            >
+              Get started
+            </Link>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

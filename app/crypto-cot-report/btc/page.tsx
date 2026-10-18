@@ -1,7 +1,16 @@
+import type { Metadata } from "next";
 import { getSheetData } from "@/lib/supabase/google/sheets";
 import { processCotRows } from "@/lib/supabase/data/cot";
 import CombinedChart from "@/components/CombinedChart";
 import PositioningBreakdown from "@/components/PositioningBreakdown";
+import SiteNav from "@/components/SiteNav";
+import SiteFooter from "@/components/SiteFooter";
+
+export const metadata: Metadata = {
+  title: "BTC COT Report",
+  description:
+    "Bitcoin Commitment of Traders positioning — commercial, non-commercial and net positioning history across the reported series.",
+};
 
 function formatNumber(value: number | null) {
   if (value === null || value === undefined) return "-";
@@ -11,7 +20,19 @@ function formatNumber(value: number | null) {
   }).format(value);
 }
 
-export default async function TestSheetsPage() {
+function ReportShell({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <SiteNav />
+      <main className="min-h-screen bg-bg text-text">
+        <div className="px-4 py-6 md:px-8">{children}</div>
+      </main>
+      <SiteFooter />
+    </>
+  );
+}
+
+export default async function BtcCotReportPage() {
   // IMPORTANT:
   // Google Sheet contains columns A:J
   const rows = await getSheetData(
@@ -22,11 +43,11 @@ export default async function TestSheetsPage() {
 
   if (!rows || rows.length === 0) {
     return (
-      <main className="min-h-screen bg-black p-10 text-white">
-        <h1 className="text-3xl font-bold">
-          No data found
-        </h1>
-      </main>
+      <ReportShell>
+        <div className="py-10">
+          <h1 className="text-3xl font-bold">No data found</h1>
+        </div>
+      </ReportShell>
     );
   }
 
@@ -34,18 +55,20 @@ export default async function TestSheetsPage() {
 
   if (data.length === 0) {
     return (
-      <main className="min-h-screen bg-black p-10 text-white">
-        <h1 className="text-3xl font-bold">
-          No usable data found
-        </h1>
-      </main>
+      <ReportShell>
+        <div className="py-10">
+          <h1 className="text-3xl font-bold">
+            No usable data found
+          </h1>
+        </div>
+      </ReportShell>
     );
   }
 
   const latest = data[data.length - 1];
 
   return (
-    <main className="min-h-screen bg-black px-4 py-6 text-white md:px-8">
+    <ReportShell>
 
       {/* ===================================================== */}
       {/* HEADER */}
@@ -59,8 +82,8 @@ export default async function TestSheetsPage() {
 
             <div className="flex items-center gap-3">
 
-              <h1 className="text-3xl font-semibold tracking-tight text-white">
-                COT BTC / ETH
+              <h1 className="text-3xl font-semibold tracking-tight text-text">
+                BTC COT Report
               </h1>
 
               <span className="border border-white/[.10] px-2 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-gray-500">
@@ -605,6 +628,7 @@ export default async function TestSheetsPage() {
 
       </section>
 
-    </main>
+      <SiteFooter />
+    </ReportShell>
   );
 }

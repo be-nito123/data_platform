@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { rateLimit } from "@/lib/rate-limit";
+
+/** Never log a full redemption code — it is a bearer credential. */
+function maskCode(code: string): string {
+  if (code.length <= 4) return "*".repeat(code.length);
+  return `${code.slice(0, 2)}${"*".repeat(code.length - 4)}${code.slice(-2)}`;
+}
 
 export async function POST(request: Request) {
   try {
@@ -37,9 +44,26 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log("Coupon redemption:", {
+    // Cap redemption attempts per account so codes cannot be brute-forced.
+    const limit = rateLimit({
+      key: `coupon-redeem:${user.id}`,
+      limit: 10,
+      windowMs: 5 * 60_000,
+    });
+
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: "Too many redemption attempts. Please try again in a few minutes." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(limit.retryAfterSeconds) },
+        }
+      );
+    }
+
+    console.log("Coupon redemption attempt:", {
       userId: user.id,
-      code: code.toUpperCase(),
+      code: maskCode(code.toUpperCase()),
     });
 
     const { data, error } = await supabase.rpc("redeem_coupon", {
@@ -49,10 +73,9 @@ export async function POST(request: Request) {
     if (error) {
       console.error("SUPABASE COUPON ERROR:", error);
 
+      // Do not forward raw Postgres errors — they can disclose schema details.
       return NextResponse.json(
-        {
-          error: error.message || "Coupon could not be redeemed.",
-        },
+        { error: "Coupon could not be redeemed. Please try again." },
         { status: 400 }
       );
     }
@@ -79,12 +102,7 @@ export async function POST(request: Request) {
     console.error("COUPON API ERROR:", error);
 
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Something went wrong while redeeming the coupon.",
-      },
+      { error: "Something went wrong while redeeming the coupon." },
       { status: 500 }
     );
   }

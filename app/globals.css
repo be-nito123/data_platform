@@ -1,6 +1,7 @@
 @import "./terminal.css";
 @import "./home.css";
 @import "./auth.css";
+@import "./site.css";
 @import "tailwindcss";
 
 /* =========================================================
@@ -31,6 +32,11 @@
   --color-blue: #007bff;
   --color-yellow: #ffb800;
   --color-cyan: #00d2d2;
+
+  /* Brand accent — the single action colour for marketing, auth, docs and
+     account surfaces. (--color-blue remains the terminal's data colour.) */
+  --color-accent: #0a84ff;
+  --color-accent-strong: #3d9bff;
 
   /* Text hierarchy */
   --color-text: #e8e9ea;

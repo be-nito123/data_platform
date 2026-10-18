@@ -1,0 +1,2 @@
+# Static assets served from the site root (e.g. /logo.svg).
+# Files placed in this directory are served at "/<filename>".

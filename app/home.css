@@ -388,7 +388,7 @@
   font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: #0a84ff;
+  color: var(--color-accent);
 }
 
 .home-title {
@@ -401,7 +401,7 @@
 }
 
 .home-title-accent {
-  background: linear-gradient(180deg, #4aa8ff, #0a84ff);
+  background: linear-gradient(180deg, #4aa8ff, var(--color-accent));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -443,8 +443,8 @@
 }
 
 .home-btn-primary {
-  background: #0a84ff;
-  border-color: #0a84ff;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
   color: #fff;
 }
 
@@ -486,7 +486,7 @@
 }
 
 .home-chip strong {
-  color: #0a84ff;
+  color: var(--color-accent);
   font-family: var(--font-mono);
   font-weight: 700;
 }
@@ -565,7 +565,7 @@
   height: 42px;
   border-radius: 12px;
   background: rgba(10, 132, 255, 0.12);
-  color: #0a84ff;
+  color: var(--color-accent);
 }
 
 .home-feature h3 {
@@ -617,7 +617,7 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #fff;
-  background: #0a84ff;
+  background: var(--color-accent);
   padding: 4px 10px;
   border-radius: 999px;
 }
@@ -679,7 +679,7 @@
 .home-tier-list svg {
   flex-shrink: 0;
   margin-top: 2px;
-  color: #0a84ff;
+  color: var(--color-accent);
 }
 
 .home-tier-cta {
