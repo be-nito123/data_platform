@@ -55,17 +55,23 @@ export function DatasetExplorer({ datasets }: { datasets: DatasetItem[] }) {
 
   return (
     <div className="dataset-explorer">
-      <div className="ds-filter" role="group" aria-label="Filter datasets by category">
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            type="button"
-            onClick={() => setCategory(cat)}
-            className={`ds-filter-option ${category === cat ? "active" : ""}`}
-          >
-            {CATEGORY_LABELS[cat] ?? cat}
-          </button>
-        ))}
+      <div className="ds-toolbar">
+        <div className="ds-filter" role="group" aria-label="Filter datasets by category">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setCategory(cat)}
+              className={`ds-filter-option ${category === cat ? "active" : ""}`}
+            >
+              {CATEGORY_LABELS[cat] ?? cat}
+            </button>
+          ))}
+        </div>
+
+        <span className="ds-toolbar-count" aria-live="polite">
+          {visible.length} of {datasets.length} datasets
+        </span>
       </div>
 
       {visible.length === 0 ? (
