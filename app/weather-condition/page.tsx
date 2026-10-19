@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getViewer, hasDailyAccess } from "@/lib/access";
 import DailyAccessGate from "@/components/DailyAccessGate";
 import SiteNav from "@/components/SiteNav";
 import SiteFooter from "@/components/SiteFooter";
@@ -171,64 +171,14 @@ export default async function WeatherConditionPage() {
    * =========================================================
    */
 
-  const supabase = await createClient();
+  const viewer = await getViewer();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let hasAccess = false;
-
-  if (user) {
-    /*
-     * ---------------------------------------------------------
-     * CHECK ADMIN
-     * ---------------------------------------------------------
-     */
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    const isAdmin = profile?.role === "admin";
-
-    if (isAdmin) {
-      hasAccess = true;
-    } else {
-      /*
-       * -------------------------------------------------------
-       * CHECK RAZORPAY PURCHASE
-       * -------------------------------------------------------
-       */
-
-      const { data: purchase } = await supabase
-        .from("purchases")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("dataset_code", "DAILY")
-        .eq("status", "paid")
-        .maybeSingle();
-
-      /*
-       * -------------------------------------------------------
-       * CHECK ACTIVE COUPON ACCESS
-       * -------------------------------------------------------
-       */
-
-      const { data: couponAccess } = await supabase
-        .from("coupon_redemptions")
-        .select("id")
-        .eq("user_id", user.id)
-        .gt("expires_at", new Date().toISOString())
-        .maybeSingle();
-
-      if (purchase || couponAccess) {
-        hasAccess = true;
-      }
-    }
-  }
+  /*
+   * Admins always see this; everyone else needs a paid Daily Access
+   * purchase or an unexpired coupon redemption.
+   */
+  const hasAccess =
+    viewer.isAdmin || (viewer.userId !== null && (await hasDailyAccess(viewer)));
 
   /*
    * =========================================================
