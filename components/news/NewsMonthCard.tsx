@@ -1,36 +1,35 @@
 import Link from "next/link";
-import {
-  NEWS_MONTH_NAMES,
-  NEWS_MONTH_SHORT,
-  type NewsEntry,
-} from "@/lib/supabase/data/news";
+import type { NewsMonth } from "@/lib/supabase/data/news";
+import { formatNewsCount } from "@/lib/news/format";
 
 /**
- * One month in the year grid. A month with no row in the sheet renders as a
- * disabled card rather than disappearing, so a gap in the data stays visible.
+ * One month of the year.
+ *
+ * Missing months stay on the page rather than disappearing from it: a gap in
+ * the sheet is information, and a grid that quietly shrinks to the months that
+ * exist hides the fact that half the year was never made.
  */
 export default function NewsMonthCard({
   year,
-  month,
+  monthName,
+  monthShort,
   entry,
 }: {
   year: number;
-  month: number;
-  entry: NewsEntry | null;
+  monthName: string;
+  monthShort: string;
+  entry: NewsMonth | undefined;
 }) {
-  const monthLabel = NEWS_MONTH_SHORT[month - 1];
-  const monthName = NEWS_MONTH_NAMES[month - 1];
-
   if (!entry) {
     return (
       <div className="news-card is-empty">
         <div className="news-card-head">
-          <span className="news-card-title">{monthLabel}</span>
+          <span className="news-card-title">{monthShort}</span>
           <span className="news-section-note">{year}</span>
         </div>
 
         <p className="news-card-summary">
-          No row for {monthName} {year} in the sheet.
+          No tab for {monthName} {year} in the sheet.
         </p>
 
         <span className="news-card-count">Missing</span>
@@ -39,18 +38,24 @@ export default function NewsMonthCard({
   }
 
   return (
-    <Link href={`/news/${entry.year}/${entry.monthSlug}`} className="news-card">
+    <Link href={`/news/${year}/${entry.monthSlug}`} className="news-card">
       <div className="news-card-head">
-        <span className="news-card-title">{monthLabel}</span>
+        <span className="news-card-title">{monthShort}</span>
         <span className="news-section-note">{year}</span>
       </div>
 
       <p className="news-card-summary">
-        {entry.headline ?? `${monthName} ${entry.year}`}
+        {entry.counts.reported === 0
+          ? "No releases recorded yet."
+          : `${formatNewsCount(entry.counts.above)} above forecast, ${formatNewsCount(
+              entry.counts.below
+            )} below.`}
       </p>
 
       <span className="news-card-count">
-        {entry.metrics.length === 1 ? "1 figure" : `${entry.metrics.length} figures`}
+        {entry.counts.events === 1
+          ? "1 event"
+          : `${formatNewsCount(entry.counts.events)} events`}
       </span>
     </Link>
   );

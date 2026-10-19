@@ -397,9 +397,9 @@ export default function ProfileClient({ isAdmin }: { isAdmin: boolean }) {
                     Monthly Data News
                   </div>
                   <p className="mt-1 max-w-xl text-[12px] leading-5 text-text-dim">
-                    What moved each month, and by how much — the month-on-month and
-                    year-on-year change for every figure. Kept off the public site and
-                    out of search engines.
+                    Every macro release, month by month — what came in against
+                    the forecast, and how it moved against the prior reading.
+                    Kept off the public site and out of search engines.
                   </p>
                 </div>
 

@@ -131,7 +131,40 @@ async function fetchSheetTitles(spreadsheetId: string): Promise<string[]> {
   return titles;
 }
 
-async function fetchSheetValues(spreadsheetId: string, range: string): Promise<string[][]> {
+/**
+ * Every tab name in a spreadsheet, in sheet order.
+ *
+ * Exported so a caller can discover what is there before asking for it. The
+ * alternative — guessing tab names and reading the "not found" error — costs a
+ * round trip per guess and reports a list of valid names only as an aside.
+ */
+export async function listSheetTitles(spreadsheetId?: string): Promise<string[]> {
+  const finalSpreadsheetId = spreadsheetId || process.env.GOOGLE_SHEET_ID;
+
+  if (!finalSpreadsheetId) {
+    throw new Error("Missing Google Spreadsheet ID");
+  }
+
+  return fetchSheetTitles(finalSpreadsheetId);
+}
+
+/**
+ * How the Sheets API should render each cell.
+ *
+ * `UNFORMATTED_VALUE` is the default because most of this app wants numbers.
+ * `FORMATTED_VALUE` is the opposite trade: it returns what a human sees in the
+ * cell, which is the only way to keep a value's unit. A cell formatted as a
+ * percentage arrives as `0.042` unformatted — the percent sign is part of the
+ * cell's format, not its value — so a reader that has to tell "4.20%" apart
+ * from "4.20" must ask for the formatted rendering.
+ */
+export type SheetRenderOption = "UNFORMATTED_VALUE" | "FORMATTED_VALUE";
+
+async function fetchSheetValues(
+  spreadsheetId: string,
+  range: string,
+  renderOption: SheetRenderOption
+): Promise<string[][]> {
   const sheets = getSheetsClient();
 
   let lastError: unknown;
@@ -141,7 +174,7 @@ async function fetchSheetValues(spreadsheetId: string, range: string): Promise<s
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId,
         range,
-        valueRenderOption: "UNFORMATTED_VALUE",
+        valueRenderOption: renderOption,
       });
 
       return (response.data.values || []) as string[][];
@@ -181,11 +214,15 @@ async function fetchSheetValues(spreadsheetId: string, range: string): Promise<s
 
   getSheetData("COT GOLD", "A1:J1000", process.env.COT_GOOGLE_SHEET_ID)
     -> a different spreadsheet (for example the COT REPORT sheet)
+
+  The fourth argument chooses the rendering. Leave it out for numbers; pass
+  "FORMATTED_VALUE" when a cell's unit matters more than its raw value.
 */
 export async function getSheetData(
   sheetNameOrRange: string,
   cellRange?: string,
-  spreadsheetId?: string
+  spreadsheetId?: string,
+  valueRenderOption: SheetRenderOption = "UNFORMATTED_VALUE"
 ): Promise<string[][]> {
   const finalSpreadsheetId = spreadsheetId || process.env.GOOGLE_SHEET_ID;
 
@@ -242,7 +279,7 @@ export async function getSheetData(
   }
 
   const qualifiedRange = `'${actualSheetName.replace(/'/g, "''")}'!${range}`;
-  const cacheKey = `${finalSpreadsheetId}::${qualifiedRange}`;
+  const cacheKey = `${finalSpreadsheetId}::${qualifiedRange}::${valueRenderOption}`;
 
   const cachedValues = readCache(sheetValuesCache, cacheKey);
   if (cachedValues) return cachedValues;
@@ -251,7 +288,7 @@ export async function getSheetData(
   const pending = inFlightValues.get(cacheKey);
   if (pending) return pending;
 
-  const request = fetchSheetValues(finalSpreadsheetId, qualifiedRange)
+  const request = fetchSheetValues(finalSpreadsheetId, qualifiedRange, valueRenderOption)
     .then((values) => {
       writeCache(sheetValuesCache, cacheKey, values);
       return values;

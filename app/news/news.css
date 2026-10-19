@@ -205,56 +205,6 @@
   background: var(--color-panel);
 }
 
-.news-metric-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-/* ---------- Change chips ---------- */
-
-.news-changes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.news-chip {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 4px 9px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-dim);
-  white-space: nowrap;
-}
-
-.news-chip-label {
-  font-family: var(--font-sans);
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-.news-chip.is-up {
-  border-color: rgba(0, 200, 81, 0.35);
-  background: rgba(0, 200, 81, 0.08);
-  color: var(--color-green);
-}
-
-.news-chip.is-down {
-  border-color: rgba(255, 68, 68, 0.35);
-  background: rgba(255, 68, 68, 0.08);
-  color: var(--color-red);
-}
-
 /* ---------- Tables ---------- */
 
 .news-table-wrap {
@@ -323,6 +273,35 @@
 
 .news-table .is-empty {
   color: var(--color-text-muted);
+}
+
+/* A week heading spanning every column, sitting above its own rows. */
+
+.news-table .news-table-week th {
+  padding: 9px 16px;
+  background: var(--color-bg-elevated);
+  font-family: var(--font-sans);
+  color: var(--color-text-dim);
+  text-align: left;
+}
+
+.news-table tbody tr:hover .news-table-week th {
+  background: var(--color-bg-elevated);
+}
+
+/* The release's name, then anything the sheet said about it underneath. */
+
+.news-event-name {
+  display: block;
+}
+
+.news-event-note {
+  display: block;
+  max-width: 40ch;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: normal;
 }
 
 /* ---------- Trend chart ---------- */
@@ -445,6 +424,27 @@
   color: var(--color-text-muted);
 }
 
+/*
+  Hue carries the direction, and the number in the cell carries the size.
+  There is deliberately no intensity ramp: cells do not share a unit, so
+  ranking a 2K move in claims against a 0.2% move in inflation would be
+  arithmetic on the wrong quantity.
+*/
+
+.news-heatmap-cell.is-up {
+  background: color-mix(in srgb, var(--color-green) 16%, transparent);
+  color: var(--color-green);
+}
+
+.news-heatmap-cell.is-down {
+  background: color-mix(in srgb, var(--color-red) 16%, transparent);
+  color: var(--color-red);
+}
+
+.news-heatmap td.is-empty {
+  background: color-mix(in srgb, var(--color-border) 30%, transparent);
+}
+
 .news-heatmap-legend {
   display: flex;
   flex-wrap: wrap;
@@ -461,48 +461,12 @@
   border-radius: 3px;
 }
 
-/* ---------- Article ---------- */
-
-.news-article {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 26px 26px 22px;
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-  background: var(--color-panel);
+.news-heatmap-swatch.is-up {
+  background: var(--color-green);
 }
 
-.news-headline {
-  margin: 0;
-  font-size: clamp(20px, 2.6vw, 27px);
-  font-weight: 600;
-  letter-spacing: -0.025em;
-  line-height: 1.25;
-  color: var(--color-text);
-}
-
-.news-summary {
-  margin: 0;
-  max-width: 78ch;
-  font-size: 13.5px;
-  line-height: 1.75;
-  color: var(--color-text-dim);
-  white-space: pre-wrap;
-}
-
-.news-source {
-  font-size: 11.5px;
-  color: var(--color-text-muted);
-}
-
-.news-source a {
-  color: var(--color-accent);
-  text-decoration: none;
-}
-
-.news-source a:hover {
-  text-decoration: underline;
+.news-heatmap-swatch.is-down {
+  background: var(--color-red);
 }
 
 /* ---------- Pager ---------- */

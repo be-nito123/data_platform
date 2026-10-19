@@ -1,48 +1,79 @@
-import type { CSSProperties } from "react";
 import Link from "next/link";
-import { NEWS_MONTH_SHORT, type NewsEntry } from "@/lib/supabase/data/news";
-import { formatNewsPercent } from "@/lib/news/format";
-
-/** The month-on-month percentage that fills the colour scale to its limit. */
-const SATURATION_PERCENT = 20;
-
-/** The colour scale, as RGB triples so the alpha can carry the magnitude. */
-const RISE_CHANNEL = "0, 200, 81";
-const FALL_CHANNEL = "255, 68, 68";
+import {
+  NEWS_MONTH_SHORT,
+  readableEventName,
+  type NewsValue,
+  type NewsMonth,
+} from "@/lib/supabase/data/news";
+import { classOf, formatNewsDelta } from "@/lib/news/format";
 
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
+/** Rows need to appear in at least this many months to earn a line. */
+const MIN_MONTHS = 2;
+
+type Row = {
+  key: string;
+  label: string;
+  /** Indexed by month - 1; null where the event did not appear. */
+  cells: (Cell | null)[];
+};
+
+type Cell = {
+  href: string;
+  delta: NewsValue | null;
+};
+
 /**
- * Twelve months across, one row per figure. Each cell is that figure's
- * month-on-month change, so a glance shows which month the sheet actually moved
- * and which it did not.
+ * Events down, months across, and in each cell the month-on-month move for that
+ * event — the sheet's "previous" reading against the actual.
+ *
+ * There is no colour intensity here, unlike a usual heatmap, because the cells
+ * do not share a unit: a 2K move in jobless claims and a 0.2% move in inflation
+ * cannot be ranked against each other. Hue carries the direction and the number
+ * carries the size.
  */
 export default function NewsHeatmap({
   year,
-  entries,
-  metrics,
+  months,
 }: {
   year: number;
-  entries: NewsEntry[];
-  metrics: { key: string; label: string }[];
+  months: NewsMonth[];
 }) {
-  const byMonth = new Map<number, NewsEntry>();
+  const byMonth = new Map(months.map((month) => [month.month, month]));
+  const rows = new Map<string, Row>();
 
-  for (const entry of entries) {
-    if (entry.year === year) byMonth.set(entry.month, entry);
+  for (const month of months) {
+    for (const event of month.events) {
+      let row = rows.get(event.matchKey);
+
+      if (!row) {
+        row = {
+          key: event.matchKey,
+          label: readableEventName(event.name),          cells: MONTHS.map(() => null),
+        };
+
+        rows.set(event.matchKey, row);
+      }
+
+      row.cells[month.month - 1] = {
+        href: `/news/${year}/${month.monthSlug}`,
+        delta: event.mom,
+      };
+    }
   }
 
-  const rows = metrics
-    .map((metric) => ({
-      ...metric,
-      values: MONTHS.map((month) => percentFor(byMonth.get(month), metric.key)),
-    }))
-    .filter((row) => row.values.some((value) => value !== null));
+  const filled = [...rows.values()]
+    .filter(
+      (row) => row.cells.filter((cell) => cell !== null).length >= MIN_MONTHS
+    )
+    .sort((left, right) => left.label.localeCompare(right.label));
 
-  if (rows.length === 0) {
+  if (filled.length === 0) {
     return (
       <p className="news-label">
-        No month-on-month movement to plot for {year} yet.
+        No event appears in more than one month of {year} yet, so there is
+        nothing to line up.
       </p>
     );
   }
@@ -52,7 +83,7 @@ export default function NewsHeatmap({
       <table className="news-heatmap">
         <thead>
           <tr>
-            <th scope="col">Figure</th>
+            <th scope="col">Event</th>
             {MONTHS.map((month) => (
               <th key={month} scope="col">
                 {NEWS_MONTH_SHORT[month - 1]}
@@ -62,33 +93,34 @@ export default function NewsHeatmap({
         </thead>
 
         <tbody>
-          {rows.map((row) => (
+          {filled.map((row) => (
             <tr key={row.key}>
               <th scope="row" className="news-heatmap-row-label">
                 {row.label}
               </th>
 
               {MONTHS.map((month, index) => {
-                const value = row.values[index];
+                const cell = row.cells[index];
                 const entry = byMonth.get(month);
 
-                if (!entry) {
+                if (!cell || !entry) {
                   return <td key={month} className="is-empty" />;
                 }
 
                 return (
                   <td key={month}>
                     <Link
-                      href={`/news/${entry.year}/${entry.monthSlug}`}
-                      className={
-                        value === null ? "news-heatmap-cell is-empty" : "news-heatmap-cell"
-                      }
-                      style={cellBackground(value)}
-                      title={`${row.label} · ${NEWS_MONTH_SHORT[month - 1]} ${year} · ${
-                        value === null ? "no change data" : formatNewsPercent(value)
+                      href={cell.href}
+                      className={`news-heatmap-cell ${classOf(
+                        cell.delta?.amount ?? null
+                      )}`.trim()}
+                      title={`${row.label} · ${entry.monthName} ${year} · ${
+                        cell.delta
+                          ? `${formatNewsDelta(cell.delta)} on the prior reading`
+                          : "no prior reading"
                       }`}
                     >
-                      {value === null ? "—" : formatNewsPercent(value)}
+                      {cell.delta ? formatNewsDelta(cell.delta) : "—"}
                     </Link>
                   </td>
                 );
@@ -98,44 +130,16 @@ export default function NewsHeatmap({
         </tbody>
       </table>
 
-      {/*
-        Without this the colours are guesswork. Intensity is a scale rather than
-        a fixed pair of colours, so it is worth saying what it tracks.
-      */}
       <p className="news-heatmap-legend">
-        <span className="news-heatmap-swatch" style={swatch(FALL_CHANNEL)} />
-        Fell
-        <span className="news-heatmap-swatch" style={swatch(RISE_CHANNEL)} />
+        <span className="news-heatmap-swatch is-up" />
         Rose
+        <span className="news-heatmap-swatch is-down" />
+        Fell
         <span className="news-label">
-          Month on month. Intensity tracks the size of the move.
+          Month on month, against the prior reading. Cells show the move in the
+          event&apos;s own unit.
         </span>
       </p>
     </div>
   );
-}
-
-/** Intensity tells the size of the move; hue tells the direction. */
-function cellBackground(percent: number | null): CSSProperties {
-  if (percent === null || !Number.isFinite(percent)) return {};
-
-  return swatch(percent >= 0 ? RISE_CHANNEL : FALL_CHANNEL, percent);
-}
-
-/**
- * A translucent fill for the scale: red when a figure fell, green when it rose,
- * deeper the further it moved. `value` is omitted for the legend swatches, which
- * want the colour at a readable strength rather than at a data point's.
- */
-function swatch(channel: string, value?: number): CSSProperties {
-  const fraction =
-    value === undefined ? 0.6 : Math.min(Math.abs(value) / SATURATION_PERCENT, 1) * 0.45 + 0.15;
-
-  return { background: `rgba(${channel}, ${fraction.toFixed(3)})` };
-}
-
-function percentFor(entry: NewsEntry | undefined, key: string): number | null {
-  if (!entry) return null;
-
-  return entry.metrics.find((metric) => metric.key === key)?.momPct ?? null;
 }

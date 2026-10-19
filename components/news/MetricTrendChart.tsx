@@ -10,17 +10,20 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { formatNewsValue } from "@/lib/news/format";
+import type { ValueUnit } from "@/lib/supabase/data/news";
+import { formatNewsAmount } from "@/lib/news/format";
 
 export type TrendSeries = {
   key: string;
   label: string;
+  /** Every point shares this unit, which is why the axis can wear it. */
+  unit: ValueUnit;
   /** Oldest point first — the order a trend line should join. */
   points: { period: string; value: number }[];
 };
 
 /*
-  One client component in the news room: choosing which figure to plot needs
+  One client component in the news room: choosing which event to plot needs
   state, and the chart needs a DOM. Everything else on these pages renders on
   the server.
 */
@@ -33,7 +36,9 @@ export default function MetricTrendChart({ series }: { series: TrendSeries[] }) 
   if (!selected || selected.points.length === 0) {
     return (
       <div className="news-panel">
-        <p className="news-chart-empty">No history to plot yet.</p>
+        <p className="news-chart-empty">
+          No event has been reported in enough months to draw a line through.
+        </p>
       </div>
     );
   }
@@ -48,7 +53,7 @@ export default function MetricTrendChart({ series }: { series: TrendSeries[] }) 
         {series.length > 1 && (
           <select
             className="news-select"
-            aria-label="Figure shown in the trend"
+            aria-label="Event shown in the trend"
             value={selected.key}
             onChange={(event) => setSelectedKey(event.target.value)}
           >
@@ -66,33 +71,37 @@ export default function MetricTrendChart({ series }: { series: TrendSeries[] }) 
           data={selected.points}
           margin={{ top: 10, right: 16, left: 0, bottom: 4 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="var(--color-border)"
+            vertical={false}
+          />
 
           <XAxis
             dataKey="period"
             tick={{ fill: "var(--color-text-muted)", fontSize: 11 }}
-            axisLine={{ stroke: "var(--color-border-strong)" }}
-            tickLine={false}
+            stroke="var(--color-border)"
           />
 
           <YAxis
-            width={72}
+            width={64}
             domain={["auto", "auto"]}
             tick={{ fill: "var(--color-text-muted)", fontSize: 11 }}
-            axisLine={{ stroke: "var(--color-border-strong)" }}
-            tickLine={false}
-            tickFormatter={(value: number) => formatNewsValue(value)}
+            stroke="var(--color-border)"
+            tickFormatter={(value: number) => formatNewsAmount(value, selected.unit)}
           />
 
-          <Tooltip content={<ChartTooltip />} cursor={{ stroke: "var(--color-border-strong)" }} />
+          <Tooltip
+            content={<TrendTooltip unit={selected.unit} />}
+            cursor={{ stroke: "var(--color-border)" }}
+          />
 
           <Line
             type="monotone"
             dataKey="value"
             stroke="var(--color-accent)"
             strokeWidth={2}
-            dot={{ r: 3, fill: "var(--color-accent)" }}
-            activeDot={{ r: 5 }}
+            dot={{ r: 3 }}
             isAnimationActive={false}
           />
         </LineChart>
@@ -108,12 +117,14 @@ type TooltipEntry = {
   payload?: { period?: string };
 };
 
-function ChartTooltip({
+function TrendTooltip({
   active,
   payload,
+  unit,
 }: {
   active?: boolean;
   payload?: TooltipEntry[];
+  unit: ValueUnit;
 }) {
   if (!active || !payload?.length) return null;
 
@@ -122,7 +133,7 @@ function ChartTooltip({
   return (
     <div className="news-tooltip">
       <div className="news-tooltip-label">{first.payload?.period}</div>
-      <div>{formatNewsValue(Number(first.value))}</div>
+      <div>{formatNewsAmount(Number(first.value), unit)}</div>
     </div>
   );
 }

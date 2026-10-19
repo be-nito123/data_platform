@@ -4,16 +4,19 @@ import { notFound } from "next/navigation";
 import { getViewer } from "@/lib/access";
 import {
   NEWS_MONTH_NAMES,
-  findNewsEntry,
+  findNewsMonth,
   getNewsArchive,
   newsTrendWindow,
+  readableEventName,
+  type ValueUnit,
 } from "@/lib/supabase/data/news";
 import NewsLocked from "@/components/news/NewsLocked";
 import { NewsWarnings } from "@/components/news/NewsNotices";
-import { NewsMetricCard, NewsMetricsTable } from "@/components/news/NewsMetrics";
+import { NewsMonthSummary, NewsEventsTable } from "@/components/news/NewsEvents";
 import MetricTrendChart, {
   type TrendSeries,
 } from "@/components/news/MetricTrendChart";
+import { baseAmount } from "@/lib/supabase/data/news-sheet";
 
 type PageParams = Promise<{ year: string; month: string }>;
 
@@ -49,44 +52,74 @@ export default async function NewsMonthPage({ params }: { params: PageParams }) 
   }
 
   const archive = await getNewsArchive();
-  const entry = findNewsEntry(archive, year, month);
+  const entry = findNewsMonth(archive, year, month);
 
   if (!entry) notFound();
 
-  const position = archive.entries.findIndex(
+  const position = archive.months.findIndex(
     (item) => item.year === year && item.month === month
   );
-  const previous = position > 0 ? archive.entries[position - 1] : undefined;
+  const previous = position > 0 ? archive.months[position - 1] : undefined;
   const next =
-    position >= 0 && position < archive.entries.length - 1
-      ? archive.entries[position + 1]
+    position >= 0 && position < archive.months.length - 1
+      ? archive.months[position + 1]
       : undefined;
 
-  const previousMonthName = NEWS_MONTH_NAMES[(month + 10) % 12];
-  const previousMonthYear = month === 1 ? year - 1 : year;
+  const earlierYear = year - 1;
 
   /*
-    One point per month, restricted to the figures this month reports so the
-    selector cannot offer a line with a single dot on it.
+    The trend line can only be drawn for events that are reported repeatedly
+    and that keep the same unit. An event's "previous" reading (MoM) cannot be
+    plotted on a trend of levels, so the chart follows the event's actual
+    reading over time. The list is restricted to those that appear at least
+    twice in the last 12 months.
   */
-  const series: TrendSeries[] = entry.metrics
-    .map((metric) => {
-      const points: { period: string; value: number }[] = [];
+  const series: TrendSeries[] = [];
+  const seen = new Map<string, { label: string; unit: ValueUnit | null }>();
 
-      for (const point of newsTrendWindow(archive, year, month)) {
-        const value = point.metrics.find((item) => item.key === metric.key)?.value;
+  for (const point of newsTrendWindow(archive, year, month)) {
+    for (const event of point.events) {
+      if (!event.actual) continue;
 
-        if (value === null || value === undefined) continue;
-
-        points.push({
-          period: `${point.monthShort} ${String(point.year).slice(2)}`,
-          value,
-        });
+      let record = seen.get(event.matchKey);
+      if (!record) {
+        record = { label: readableEventName(event.name), unit: event.actual.unit };
+        seen.set(event.matchKey, record);
+      } else if (record.unit !== null && record.unit !== event.actual.unit) {
+        // A single event cannot jump units; skip it rather than throwing.
+        record.unit = null;
       }
+    }
+  }
 
-      return { key: metric.key, label: metric.label, points };
-    })
-    .filter((item) => item.points.length > 1);
+  for (const [matchKey, meta] of seen) {
+    if (meta.unit === null) continue;
+
+    const points: { period: string; value: number }[] = [];
+
+    for (const point of newsTrendWindow(archive, year, month)) {
+      const event = point.events.find((item) => item.matchKey === matchKey);
+      const actual = event?.actual;
+
+      if (!actual) continue;
+
+      points.push({
+        period: `${point.monthShort} ${String(point.year).slice(2)}`,
+        value: baseAmount(actual),
+      });
+    }
+
+    if (points.length > 1) {
+      series.push({
+        key: matchKey,
+        label: meta.label,
+        unit: meta.unit,
+        points,
+      });
+    }
+  }
+
+  series.sort((left, right) => left.label.localeCompare(right.label));
 
   return (
     <>
@@ -110,60 +143,46 @@ export default async function NewsMonthPage({ params }: { params: PageParams }) 
           </h1>
 
           <p className="news-lede">
-            Month-on-month against {previousMonthName} {previousMonthYear}, and
-            year-on-year against {entry.monthName} {year - 1}.
+            The month&apos;s releases. Month-on-month compares the actual
+            against the sheet&apos;s <em>previous</em> reading for each event.
+            Year-on-year compares against {entry.monthName} {earlierYear} — it
+            only appears once that month&apos;s tab exists.
           </p>
         </div>
       </section>
 
-      <div className="news-container" style={{ paddingTop: 32, paddingBottom: 72 }}>
+      <div
+        className="news-container"
+        style={{ paddingTop: 32, paddingBottom: 72 }}
+      >
         <NewsWarnings warnings={archive.warnings} />
 
         <div style={{ marginTop: archive.warnings.length ? 24 : 0 }}>
-          <article className="news-article">
-            <p className="news-eyebrow is-muted" style={{ margin: 0 }}>
-              Commentary
-            </p>
-
-            <h2 className="news-headline">
-              {entry.headline ?? `No headline recorded for ${entry.monthName} ${entry.year}.`}
-            </h2>
-
-            {entry.summary ? (
-              <p className="news-summary">{entry.summary}</p>
-            ) : (
-              <p className="news-label" style={{ margin: 0 }}>
-                No commentary for this month.
-              </p>
-            )}
-
-            {entry.source && (
-              <p className="news-source" style={{ margin: 0 }}>
-                Source: <SourceLink source={entry.source} />
-              </p>
-            )}
-          </article>
-
           <section className="news-section">
             <div className="news-section-head">
-              <h2 className="news-section-title">Figures</h2>
+              <h2 className="news-section-title">At a glance</h2>
               <span className="news-section-note">
-                {entry.metrics.length === 1
-                  ? "1 metric"
-                  : `${entry.metrics.length} metrics`}
+                From the {entry.tab} tab
               </span>
             </div>
 
-            {entry.metrics.length === 0 ? (
+            <NewsMonthSummary month={entry} />
+          </section>
+
+          <section className="news-section">
+            <div className="news-section-head">
+              <h2 className="news-section-title">Events</h2>
+              <span className="news-section-note">
+                Actual, forecast, previous — with surprises and MoM/YoY
+              </span>
+            </div>
+
+            {entry.events.length === 0 ? (
               <p className="news-label">
-                No figures were found in the {entry.monthShort} tab.
+                No releases were found in this month&apos;s tab.
               </p>
             ) : (
-              <div className="news-metrics">
-                {entry.metrics.map((metric) => (
-                  <NewsMetricCard key={metric.key} metric={metric} />
-                ))}
-              </div>
+              <NewsEventsTable weeks={entry.weeks} />
             )}
           </section>
 
@@ -174,15 +193,6 @@ export default async function NewsMonthPage({ params }: { params: PageParams }) 
             </div>
 
             <MetricTrendChart series={series} />
-          </section>
-
-          <section className="news-section">
-            <div className="news-section-head">
-              <h2 className="news-section-title">Breakdown</h2>
-              <span className="news-section-note">MoM vs YoY</span>
-            </div>
-
-            <NewsMetricsTable metrics={entry.metrics} />
           </section>
 
           <nav className="news-pager" aria-label="Other months">
@@ -222,21 +232,5 @@ export default async function NewsMonthPage({ params }: { params: PageParams }) 
         </div>
       </div>
     </>
-  );
-}
-
-/* ========================================================= */
-/* SMALL PARTS                                               */
-/* ========================================================= */
-
-function SourceLink({ source }: { source: string }) {
-  if (!/^https?:\/\//i.test(source)) {
-    return <span>{source}</span>;
-  }
-
-  return (
-    <a href={source} target="_blank" rel="noreferrer noopener">
-      {source}
-    </a>
   );
 }

@@ -1,72 +1,92 @@
 /* =========================================================
    NEWS — display formatting.
 
-   The monthly sheet holds values only; every number the
-   reader sees is formatted here so the cards, the table and
-   the chart can never disagree about rounding.
+   The sheet holds figures with units ("197K", "4.20%"); the reader keeps that
+   unit on the value. Everything the eye sees is formatted here, so the cards,
+   the table, the matrix and the chart cannot disagree about rounding or about
+   whether a number wears a percent sign.
    ========================================================= */
 
-export type ChangeDirection = "up" | "down" | "flat";
+import type { NewsValue, ValueUnit } from "@/lib/supabase/data/news";
+
+/** The unit as it is written back out: "197K", "4.20%" — but not "197". */
+const UNIT_SUFFIX: Record<ValueUnit, string> = {
+  number: "",
+  percent: "%",
+  thousand: "K",
+  million: "M",
+  billion: "B",
+};
+
+/* =========================================================
+   DIRECTION
+   ========================================================= */
+
+type ChangeDirection = "up" | "down" | "flat";
 
 /** Which way a delta points. Zero and gaps are "flat", not "down". */
-export function changeDirection(value: number | null): ChangeDirection {
-  if (value === null || !Number.isFinite(value) || value === 0) return "flat";
+function directionOf(amount: number | null): ChangeDirection {
+  if (amount === null || !Number.isFinite(amount) || amount === 0) return "flat";
 
-  return value > 0 ? "up" : "down";
+  return amount > 0 ? "up" : "down";
 }
 
 /** The `is-up` / `is-down` modifier, or an empty string when flat. */
-export function changeClass(value: number | null): string {
-  const direction = changeDirection(value);
+export function classOf(amount: number | null): string {
+  const direction = directionOf(amount);
 
   return direction === "flat" ? "" : `is-${direction}`;
 }
 
-/** A plain value, or an em dash when the sheet has nothing. */
-export function formatNewsValue(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return "—";
+/** The same modifier, for a figure rather than a bare number. */
+export function changeClass(value: NewsValue | null): string {
+  return classOf(value?.amount ?? null);
+}
 
+/* =========================================================
+   VALUES
+   ========================================================= */
+
+/** "197K" / "4.20%" / "6,657B" / "—". */
+export function formatNewsValue(value: NewsValue | null): string {
+  if (!value || !Number.isFinite(value.amount)) return "—";
+
+  return `${formatAmount(value.amount)}${UNIT_SUFFIX[value.unit]}`;
+}
+
+/** A bare figure in a known unit, for the parts that hold numbers apart. */
+export function formatNewsAmount(amount: number | null, unit: ValueUnit): string {
+  if (amount === null || !Number.isFinite(amount)) return "—";
+
+  return `${formatAmount(amount)}${UNIT_SUFFIX[unit]}`;
+}
+
+/** "+2K" / "−0.4%" / "—". */
+export function formatNewsDelta(value: NewsValue | null): string {
+  if (!value || !Number.isFinite(value.amount)) return "—";
+
+  return `${signOf(value.amount)}${formatAmount(Math.abs(value.amount))}${
+    UNIT_SUFFIX[value.unit]
+  }`;
+}
+
+/** "12" — a count, not a measured figure. */
+export function formatNewsCount(value: number): string {
+  return new Intl.NumberFormat("en-US").format(value);
+}
+
+/* =========================================================
+   INTERNALS
+   ========================================================= */
+
+/** Magnitude-dependent precision: 1000+ reads better without decimals. */
+function formatAmount(value: number): string {
   return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: fractionDigits(value),
   }).format(value);
 }
 
-/** "+1,240" / "−86" / "—". */
-export function formatNewsChange(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return "—";
-
-  return `${signOf(value)}${new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: fractionDigits(value),
-  }).format(Math.abs(value))}`;
-}
-
-/** "+4.5%" / "−0.8%" / "—". */
-export function formatNewsPercent(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return "—";
-
-  return `${signOf(value)}${new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  }).format(Math.abs(value))}%`;
-}
-
-/** The arrow that fits inside a chip. */
-export function newsArrow(value: number | null): string {
-  const direction = changeDirection(value);
-
-  if (direction === "up") return "▲";
-  if (direction === "down") return "▼";
-
-  return "•";
-}
-
-/* ========================================================= */
-/* INTERNALS                                                 */
-/* ========================================================= */
-
-/** Magnitude-dependent precision: 1000+ reads better without decimals. */
 function fractionDigits(value: number): number {
   const magnitude = Math.abs(value);
 

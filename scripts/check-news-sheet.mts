@@ -4,8 +4,8 @@
     npm run check:news
 
   The sheet contract is the part of the news room that fails silently: a
-  renamed column, a duplicated heading or a tab that has not been created yet
-  must produce a warning, never a wrong number. `lib/supabase/data/news-sheet.ts`
+  renamed column, a header row buried under a title or a tab that has not been
+  created yet must produce a warning, never a wrong number. `lib/supabase/data/news-sheet.ts`
   is pure precisely so this can run with no credentials, no network and no
   browser.
 */
@@ -14,266 +14,191 @@ import assert from "node:assert/strict";
 
 import {
   buildNewsArchive,
-  findNewsEntry,
+  findNewsMonth,
   newsTrendWindow,
-  type MonthGrid,
-  type NewsMetric,
 } from "../lib/supabase/data/news-sheet.ts";
 
-const HEADER = ["Year", "Exports", "Lead", "Headline", "Narrative", "Source"];
+const HEADER = [
+  "week",
+  "Event type",
+  "date , time (ist)",
+  "actual",
+  "forcast",
+  "previous",
+  "USD Bias",
+  "bond",
+  "yeild",
+  "nas100",
+  "Notes",
+];
 
-const GRIDS: MonthGrid[] = [
+const GRIDS = [
   {
-    month: 1,
+    tab: "Jan 2025",
     rows: [
       HEADER,
-      [2025, 100, "1.2M", "Copper tariffs bite", "January 2025 narrative.", "Reuters"],
-      [2026, 132, "(1,234)", "Copper recovers", "January 2026 narrative.", "Reuters"],
+      ["Week 1", "ISM Manufacturing", "Thu 1, 7:30 pm", "52.7", "52.3", "52.4", "risk-on"],
+      ["", "NFP", "Fri 2, 6:00 pm", "197K", "201K", "198K", "risk-off"],
     ],
   },
   {
-    // A title row and a spacer sit above the real header; the probe must still
-    // find it. "Notes" is free text and must be left out with a warning.
-    month: 2,
+    tab: "JANUARY 2026",
     rows: [
-      ["Monthly data news — February"],
+      ["Elite Capital — Macro"],
       [],
-      [...HEADER, "Notes"],
-      [2025, 110, "2.5k", "Steel demand softens", "February 2025 narrative.", "Reuters", "free text"],
-      [2026, 143, "2.75k", "Steel rebounds", "February 2026 narrative.", "Reuters", "more free text"],
+      HEADER,
+      ["Week 1", "ISM Manufacturing", "Thu 1, 7:30 pm", "54.5", "54.8", "54.6", "risk-off"],
+      ["", "NFP", "Fri 2, 6:00 pm", "213K", "215K", "213K", "risk-neutral"],
     ],
   },
   {
-    month: 3,
-    rows: [HEADER, [2025, 120, 3_000_000, "March headline", "March narrative.", "Reuters"]],
+    tab: "February 2026",
+    rows: [
+      HEADER,
+      ["Week 1", "ISM Manufacturing", "Mon 2, 7:30 pm", "55.0", "54.7", "54.5"],
+      ["Week 2", "Initial Jobless Claims", "Thu 5, 6:00 pm", "200K", "205K", "197K"],
+    ],
   },
   {
-    // December exists so that January 2026 has something to measure against.
-    month: 12,
-    rows: [HEADER, [2025, 120, 2_400_000, "December headline", "December narrative.", "Reuters"]],
+    // Not a month tab — should be ignored with a warning.
+    tab: "EIA Report",
+    rows: [
+      ["Date", "Crude"],
+      ["27 Aug", "420.7"],
+    ],
   },
 ];
 
-const archive = buildNewsArchive(GRIDS);
+const archive = buildNewsArchive(GRIDS, 2026);
 
-function entryOf(year: number, month: number) {
-  const found = findNewsEntry(archive, year, month);
-  assert.ok(found, `no entry for ${year}-${month}`);
-
+function monthOf(year: number, month: number) {
+  const found = findNewsMonth(archive, year, month);
+  assert.ok(found, `no month for ${year}-${month}`);
   return found;
 }
 
-function metricOf(year: number, month: number, key = "exports"): NewsMetric {
-  const found = entryOf(year, month).metrics.find((metric) => metric.key === key);
-  assert.ok(found, `no "${key}" for ${year}-${month}`);
-
-  return found;
-}
-
-function close(actual: number | null, expected: number, label: string) {
+/** Float-safe equality: 54.5 − 54.1 is 0.4000000000000057, and 0.4 it is. */
+function approx(actual: number | null | undefined, expected: number) {
+  assert.notEqual(actual, null, `expected ${expected}, got null`);
   assert.ok(
-    actual !== null && Math.abs(actual - expected) < 1e-9,
-    `${label}: expected ${expected}, got ${actual}`
+    Math.abs((actual as number) - expected) < 1e-9,
+    `expected ≈${expected}, got ${actual}`
   );
 }
 
-/* ========================================================= */
-/* SHAPE                                                     */
-/* ========================================================= */
+/* =========================================================
+   SHAPE
+   ========================================================= */
 
 {
-  assert.equal(archive.entries.length, 6);
-  assert.deepEqual(archive.years, [2026, 2025]);
-  assert.deepEqual(
-    archive.entries.map((item) => `${item.year}-${item.monthSlug}`),
-    ["2025-01", "2025-02", "2025-03", "2025-12", "2026-01", "2026-02"]
+  // Both January tabs resolved; the explicit one (2026) is kept.
+  assert.equal(archive.months.length, 3, JSON.stringify(archive.months.map((m) => m.tab)));
+
+  const jan2025 = monthOf(2025, 1);
+  assert.equal(jan2025.monthName, "January");
+  assert.equal(jan2025.monthShort, "Jan");
+  assert.equal(jan2025.monthSlug, "01");
+  assert.equal(jan2025.events.length, 2);
+
+  const nfp = jan2025.events.find((event) => event.matchKey === "nfp");
+  assert.ok(nfp);
+  assert.equal(nfp?.actual?.amount, 197);
+  assert.equal(nfp?.actual?.unit, "thousand");
+  assert.equal(nfp?.actual?.raw, "197K");
+  assert.equal(nfp?.forecast?.amount, 201);
+  assert.equal(nfp?.mom?.amount, -1);
+  assert.equal(nfp?.mom?.unit, "thousand");
+  assert.equal(nfp?.bias, "risk-off");
+
+  const ism = jan2025.events.find((event) => event.matchKey === "ism manufacturing");
+  assert.ok(ism);
+  assert.equal(ism?.actual?.amount, 52.7);
+  approx(ism?.surprise?.amount, 0.4);
+  assert.equal(ism?.against, "above");
+
+  const jan2026 = monthOf(2026, 1);
+  assert.equal(jan2026.events[1]?.mom?.amount, 0); // 213K vs 213K
+
+  // Year on year: NFP 2026 actual 213K vs 2025 197K → +16K
+  const nfp2026 = jan2026.events.find((event) => event.matchKey === "nfp");
+  assert.ok(nfp2026?.yoy);
+  assert.equal(nfp2026?.yoy?.amount, 16);
+  assert.equal(nfp2026?.yoy?.unit, "thousand");
+
+  // The EIA Report tab was ignored.
+  const warnings = archive.warnings.join(" ");
+  assert.ok(warnings.includes("EIA Report"), warnings);
+}
+
+/* =========================================================
+   TREND
+   ========================================================= */
+
+{
+  const trend = newsTrendWindow(archive, 2026, 2);
+  assert.equal(trend.length, 3); // Jan 2025, Jan 2026, Feb 2026
+  assert.equal(trend[0].month, 1);
+  assert.equal(trend[0].year, 2025);
+}
+
+/* =========================================================
+   TWO TABS, ONE MONTH
+   ========================================================= */
+
+{
+  const collision = buildNewsArchive(
+    [
+      // A placeholder somebody created first and never filled in.
+      {
+        tab: "April 2026",
+        rows: [["Elite Capital — Macro"], [], HEADER],
+      },
+      {
+        tab: "APRIL MASTER SHEET",
+        rows: [
+          HEADER,
+          ["Week 1", "ISM Manufacturing", "Wed 1, 7:30 pm", "52.7", "52.3", "52.4"],
+          ["", "NFP", "Fri 3, 6:00 pm", "180K", "175K", "160K"],
+        ],
+      },
+      // Two tabs that are equally full: only the explicit year can decide.
+      {
+        tab: "MAY 2026",
+        rows: [HEADER, ["Week 1", "ISM Manufacturing", "Fri 1, 7:30 pm", "54.0", "53.5", "52.7"]],
+      },
+      {
+        tab: "MAY MASTER SHEET",
+        rows: [HEADER, ["Week 1", "ISM Manufacturing", "Fri 1, 7:30 pm", "53.9", "53.5", "52.7"]],
+      },
+    ],
+    2026
   );
 
-  // The first tab to define a metric fixes its wording for every month.
-  assert.deepEqual(
-    archive.metrics.map((metric) => `${metric.key}=${metric.label}`),
-    ["exports=Exports", "lead=Lead"]
-  );
+  assert.equal(collision.months.length, 2);
 
-  const january = entryOf(2025, 1);
-  assert.equal(january.monthName, "January");
-  assert.equal(january.monthShort, "Jan");
-  assert.equal(january.monthSlug, "01");
-  assert.equal(january.headline, "Copper tariffs bite");
-  assert.equal(january.summary, "January 2025 narrative.");
-  assert.equal(january.source, "Reuters");
+  // The tab with something in it beats the empty one, not the other way round.
+  const april = findNewsMonth(collision, 2026, 4);
+  assert.equal(april?.tab, "APRIL MASTER SHEET");
+  assert.equal(april?.events.length, 2);
+  assert.equal(april?.events[1]?.mom?.amount, 20); // 180K against 160K
 
-  // February's header sat below a title row and was still found.
-  assert.equal(entryOf(2025, 2).headline, "Steel demand softens");
+  // Equal counts are settled by the tab that spells its year out.
+  const may = findNewsMonth(collision, 2026, 5);
+  assert.equal(may?.tab, "MAY 2026");
+  assert.equal(may?.events[0]?.actual?.amount, 54);
 
-  // The unrecognised text column is dropped, and said so.
-  assert.ok(
-    archive.warnings.some(
-      (warning) => warning.includes("Notes") && warning.includes("February")
-    ),
-    `expected a warning about Notes, got ${JSON.stringify(archive.warnings)}`
-  );
-  assert.equal(archive.warnings.length, 1, JSON.stringify(archive.warnings));
+  const reported = collision.warnings.join(" ");
+  assert.ok(reported.includes("April 2026"), reported);
+  assert.ok(reported.includes("MAY MASTER SHEET"), reported);
+  // The losing tab's own complaints are not reported — it did not get used.
+  assert.ok(!reported.includes("no header row"), reported);
 }
 
 /* ========================================================= */
-/* DELTAS                                                    */
-/* ========================================================= */
 
-{
-  // January 2025 is the first month on record: nothing to compare against.
-  const january2025 = metricOf(2025, 1);
-  assert.equal(january2025.value, 100);
-  assert.equal(january2025.mom, null);
-  assert.equal(january2025.momPct, null);
-  assert.equal(january2025.yoy, null);
-  assert.equal(january2025.yoyPct, null);
-
-  // February 2025 has a month-on-month comparison and no prior year.
-  const february2025 = metricOf(2025, 2);
-  assert.equal(february2025.mom, 10);
-  assert.equal(february2025.momPct, 10);
-  assert.equal(february2025.yoy, null);
-
-  // March 2025: 110 -> 120.
-  const march2025 = metricOf(2025, 3);
-  assert.equal(march2025.mom, 10);
-  close(march2025.momPct, (10 / 110) * 100, "March 2025 MoM %");
-
-  // December 2025 has no November on record, so month-on-month is a gap.
-  assert.equal(metricOf(2025, 12).mom, null);
-  assert.equal(metricOf(2025, 12).momPct, null);
-
-  // January 2026 rolls month-on-month back to December 2025, and reads
-  // year-on-year from the row above it in the same tab.
-  const january2026 = metricOf(2026, 1);
-  assert.equal(january2026.value, 132);
-  assert.equal(january2026.mom, 132 - 120);
-  assert.equal(january2026.momPct, 10);
-  assert.equal(january2026.yoy, 32);
-  assert.equal(january2026.yoyPct, 32);
-
-  // February 2026 compares against January 2026 and February 2025.
-  const february2026 = metricOf(2026, 2);
-  assert.equal(february2026.mom, 11);
-  close(february2026.momPct, (11 / 132) * 100, "February 2026 MoM %");
-  assert.equal(february2026.yoy, 33);
-  assert.equal(february2026.yoyPct, 30);
-}
-
-/* ========================================================= */
-/* VALUE FORMATS                                             */
-/* ========================================================= */
-
-{
-  const cases: [number, number, number][] = [
-    [2025, 1, 1_200_000], // "1.2M"
-    [2026, 1, -1_234], // "(1,234)"
-    [2025, 2, 2_500], // "2.5k"
-    [2026, 2, 2_750], // "2.75k"
-    [2025, 3, 3_000_000], // a real number
-    [2025, 12, 2_400_000], // a real number
-  ];
-
-  for (const [year, month, expected] of cases) {
-    assert.equal(metricOf(year, month, "lead").value, expected, `lead ${year}-${month}`);
-  }
-
-  // The scaled column still reports its own deltas. February 2026 measures
-  // against January 2026, which is negative, so the absolute move is reported
-  // and the percentage is not.
-  const leadFebruary2026 = metricOf(2026, 2, "lead");
-  assert.equal(leadFebruary2026.value, 2_750);
-  assert.equal(leadFebruary2026.mom, 2_750 - -1_234);
-  assert.equal(leadFebruary2026.momPct, null);
-}
-
-/* ========================================================= */
-/* GAPS AND EDGES                                            */
-/* ========================================================= */
-
-{
-  // A month with no tab is simply absent, not zero.
-  assert.equal(findNewsEntry(archive, 2025, 6), undefined);
-
-  // A zero baseline must not become an infinite percentage.
-  const zeroBaseline = buildNewsArchive([
-    { month: 1, rows: [["Year", "Index"], [2025, 0]] },
-    { month: 2, rows: [["Year", "Index"], [2025, 10]] },
-  ]);
-  assert.equal(zeroBaseline.entries[1].metrics[0].mom, 10);
-  assert.equal(zeroBaseline.entries[1].metrics[0].momPct, null);
-
-  // Neither must a negative baseline.
-  const negativeBaseline = buildNewsArchive([
-    { month: 1, rows: [["Year", "Net"], [2025, -100]] },
-    { month: 2, rows: [["Year", "Net"], [2025, -50]] },
-  ]);
-  assert.equal(negativeBaseline.entries[1].metrics[0].mom, 50);
-  assert.equal(negativeBaseline.entries[1].metrics[0].momPct, null);
-}
-
-{
-  // Two columns may share a heading; the second is suffixed, not lost.
-  const duplicates = buildNewsArchive([
-    { month: 1, rows: [["Year", "Change", "Change"], [2025, 1, 2]] },
-  ]);
-  assert.deepEqual(
-    duplicates.entries[0].metrics.map((metric) => metric.key),
-    ["change", "change-2"]
-  );
-}
-
-{
-  // No "Year" heading: column A is used, and the reader says so.
-  const noYearHeader = buildNewsArchive([
-    { month: 1, rows: [["", "Exports"], [2025, 100], [2026, 132]] },
-  ]);
-
-  assert.equal(noYearHeader.entries.length, 2);
-  assert.equal(noYearHeader.entries[1].year, 2026);
-  assert.equal(noYearHeader.entries[1].metrics[0].yoy, 32);
-  assert.ok(noYearHeader.warnings.some((warning) => warning.includes('"Year"')));
-}
-
-{
-  // Rows whose Year cell is unusable are skipped rather than guessed at.
-  const junk = buildNewsArchive([
-    { month: 1, rows: [["Year", "Index"], ["n/a", 5], [2025, 100], [], [null, 7]] },
-  ]);
-  assert.equal(junk.entries.length, 1);
-  assert.equal(junk.entries[0].metrics[0].value, 100);
-}
-
-{
-  // Nothing configured at all: an empty archive, not a throw.
-  const empty = buildNewsArchive([], ["No spreadsheet configured."]);
-  assert.deepEqual(empty.entries, []);
-  assert.deepEqual(empty.years, []);
-  assert.deepEqual(empty.metrics, []);
-  assert.deepEqual(empty.warnings, ["No spreadsheet configured."]);
-}
-
-/* ========================================================= */
-/* TREND WINDOW                                              */
-/* ========================================================= */
-
-{
-  assert.deepEqual(
-    newsTrendWindow(archive, 2026, 2).map((item) => `${item.year}-${item.monthSlug}`),
-    ["2025-01", "2025-02", "2025-03", "2025-12", "2026-01", "2026-02"]
-  );
-
-  assert.deepEqual(
-    newsTrendWindow(archive, 2026, 2, 3).map((item) => `${item.year}-${item.monthSlug}`),
-    ["2025-12", "2026-01", "2026-02"]
-  );
-
-  // The window never reaches past its end month.
-  assert.deepEqual(
-    newsTrendWindow(archive, 2025, 2).map((item) => item.monthSlug),
-    ["01", "02"]
-  );
-}
-
-console.log(`news sheet reader: ${archive.entries.length} rows, ${archive.metrics.length} metrics — all checks passed`);
+console.log(
+  `news sheet reader: ${archive.months.length} month(s), ${archive.months.reduce(
+    (total, m) => total + m.events.length,
+    0
+  )} event(s) — all checks passed`
+);

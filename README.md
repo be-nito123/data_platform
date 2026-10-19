@@ -142,58 +142,68 @@ account surfaces. The terminal keeps `--color-blue` for its data palette.
 
 ## Monthly news (`/news`)
 
-An admin-only room showing what moved each month: month-on-month and year-on-year
-change for every figure the news sheet tracks, plus the commentary behind it.
+An admin-only room showing what moved each month: every macro release in the
+month's tab, what came in against the forecast, and how it moved against the
+prior reading.
 
 Access is decided by `profiles.role = 'admin'`, checked server-side in
 `lib/access.ts` **before** the spreadsheet is read — a signed-out visitor gets the
 locked screen and no sheet data is fetched at all. The section is deliberately
 absent from the site navigation, the sitemap, and every public surface; it is
-disallowed in `robots.txt` and carries `noindex, nofollow`.
+disallowed in `robots.txt` and carries `robots: { index: false, follow: false }`.
 
-| Route                    | What it shows                                        |
-| ------------------------ | ---------------------------------------------------- |
-| `/news`                  | Latest month, then the years on record                |
-| `/news/[year]`           | A 12-cell month-on-month heatmap and all twelve months |
-| `/news/[year]/[month]`   | Commentary, figures, a 12-month trend line, and a YoY/MoM table |
+| Route                  | What it shows                                        |
+| ---------------------- | ---------------------------------------------------- |
+| `/news`                | The latest month, then the years on record           |
+| `/news/[year]`         | An event-by-month matrix, plus all twelve month cells |
+| `/news/[year]/[month]` | The month's events with surprise, MoM and YoY, and a trend |
 
 ### Sheet contract
 
-`NEWS_GOOGLE_SHEET_ID` names a spreadsheet with twelve tabs, `Jan` … `Dec`. Each
-tab holds **every year as a row**:
+`NEWS_GOOGLE_SHEET_ID` names a spreadsheet whose **monthly tabs start with a
+month**: `October 2026` for a particular month, or `OCT MASTER SHEET` for the tab
+that is kept up to date, which is read as the current year. Every other tab in the
+workbook — an auction report, a rig count, an EIA report — is left alone.
 
-| Year | <metric> | <metric> | … | Headline | Narrative | Source |
-| ---- | -------- | -------- | - | -------- | --------- | ------ |
-| 2025 | 110      | …        | … | What happened | A paragraph of context. | Reuters |
-| 2026 | 121      | …        | … | What happened next | More detail. | Reuters |
+Each monthly tab is a macro event calendar:
 
-- **`Year` is required** and is found by name anywhere in the header row, which
-  the loader looks for within the first ten rows — a title row above the header
-  is fine. If there is no `Year` heading, column A is used and a warning is shown.
-- **Every other numeric column becomes a figure.** Its heading is the label.
-  Adding a column in Sheets makes it appear on the site with no code change, and
-  reordering columns is harmless. A column needs ≥ 80% of its values to parse as
-  numbers to count; one that does not is reported and left out rather than
-  plotted as zeros.
-- **Text columns** are matched by heading: `Headline` (`Title`), `Summary`
-  (`Narrative`, `Description`, `Details`, `Commentary`, or loosely `Notes`) and
-  `Source` (`Link`, `URL`, `Reference`). An exact heading beats a loose one, so a
-  sheet carrying both `Narrative` and `Notes` uses `Narrative` and says so.
-  `Month`/`Date` columns are ignored — the tab name already carries the month.
-- **Values** may be numbers, percentages, thousands separators, currency, short
-  scales (`1.2k`, `3M`) or accountancy negatives (`(1,234)`).
+| week   | Event type        | date , time (ist) | US time         | actual | forcast | previous | USD Bias  |
+| ------ | ----------------- | ----------------- | --------------- | ------ | ------- | -------- | --------- |
+| Week 1 | ISM Manufacturing | Thu 1, 7:30 pm    | Thu 1, 10:00 am | 54.5   | 54.8    | 54.6     | risk-off  |
+|        | NFP (Sep)         | Fri 2, 6:00 pm    | Fri 2, 8:30 am  | 29K    | 89K     | 133K     | risk-on   |
 
-### How the deltas are computed
+- **Columns are matched by heading, never by position.** Two tabs in the same
+  workbook already disagree about which columns they carry, and October's header
+  reads `week Sep` while the tab holds October — so the tab name wins and the
+  heading is only used to find the columns. The header is the first row within
+  the first twelve that names an `Event type`; a tab without one is reported
+  rather than guessed at.
+- **`actual` is the figure that came in.** `forcast` (or `forecast`) gives the
+  surprise, and `previous` is the sheet's own prior reading of the same event —
+  which is what the month-on-month change is measured against.
+- **Week headings carry down.** `Week 1` is written once, on the first row of
+  that week, and applies to the rows beneath it.
+- **Values keep the unit they were written in** — `197K`, `4.20%`, `6,657 B`,
+  accountancy negatives (`(1,234)`) and trailing annotations
+  (`0.086% (8 ponts)`). Anything that is not a figure — a worked example, a
+  note — parses to nothing rather than to a plausible wrong number.
 
-Month-on-month reads the **previous month's tab**, and January rolls back to
-December of the year before. Year-on-year reads the **previous year's row in the
-same tab**. Both are computed in-process from the raw values; formula cells in
-the sheet are never trusted, so a broken formula surfaces as a gap rather than as
-a confident wrong number.
+### How the comparisons are computed
 
-A percentage is only reported when the baseline is positive. A figure that moves
-from −1,234 to +2,750 is not a rise of 323% of anything, so the absolute change is
-shown and the percentage is left blank.
+Month-on-month is `actual` minus the sheet's own `previous` reading, so it needs
+no earlier tab. Year-on-year matches the same event by name in the same month of
+the previous year, and is blank until a tab for that year exists — the page says
+so rather than printing a confident zero.
+
+Both are computed in-process from the raw cells; formula cells are never trusted,
+so a broken formula surfaces as a gap rather than as a wrong number. Units differ
+from row to row, so nothing is summed across events: the matrix tints each cell
+for direction and prints the size in the event's own unit.
+
+The reader asks the Sheets API for `FORMATTED_VALUE` rather than the
+`UNFORMATTED_VALUE` the rest of the app uses. A cell formatted as a percentage
+arrives as `0.042` unformatted — the percent sign is part of the cell's format,
+not its value — so unformatted rendering would turn every `4.20%` into `0.042`.
 
 Anything the loader cannot make sense of — a missing tab, a non-numeric column,
 no spreadsheet configured — becomes a banner on the page rather than an error.

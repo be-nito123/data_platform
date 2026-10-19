@@ -1,9 +1,8 @@
-import { NEWS_MONTH_NAMES, NEWS_MONTH_TABS } from "@/lib/supabase/data/news";
-
 /**
- * Problems found while reading the sheet — a missing tab, a column that is not
- * numeric, no spreadsheet configured. Shown rather than swallowed, because a
- * silently empty news room looks like a bug in the site.
+ * Problems found while reading the sheet — a tab that is not named after a
+ * month, a header row that is missing, a spreadsheet that could not be opened.
+ * Shown rather than swallowed, because a silently empty news room looks like a
+ * bug in the site rather than like a sheet that needs a column renamed.
  */
 export function NewsWarnings({ warnings }: { warnings: string[] }) {
   if (warnings.length === 0) return null;
@@ -32,62 +31,59 @@ export function NewsWarnings({ warnings }: { warnings: string[] }) {
 }
 
 /**
- * The screen a new deployment sees before any of the monthly tabs exist.
+ * The screen a new deployment sees before any monthly tab exists.
  *
- * It describes the layout the loader expects, because that contract is what
- * decides whether the numbers render at all.
+ * It spells out the contract, because that is the whole distance between an
+ * empty room and a working one: name a tab after a month, and give it a header
+ * row with an event and its figures.
  */
 export function NewsSheetSetup() {
   return (
     <div className="news-empty">
-      <p className="news-eyebrow is-muted">Not configured yet</p>
+      <p className="news-eyebrow">Nothing to read yet</p>
 
       <h2 className="news-section-title" style={{ marginTop: 10 }}>
         No monthly tabs were found
       </h2>
 
-      <p className="news-lede" style={{ marginTop: 10 }}>
-        This room reads twelve tabs —{" "}
-        {NEWS_MONTH_NAMES.map((name, index) => (
-          <span key={name}>
-            <code className="news-code">{NEWS_MONTH_TABS[index]}</code>
-            {index < NEWS_MONTH_NAMES.length - 1 ? ", " : ""}
-          </span>
-        ))}{" "}
-        — from the spreadsheet named by{" "}
-        <code className="news-code">NEWS_GOOGLE_SHEET_ID</code>. Each tab holds
-        every year as a row, so <code className="news-code">Jan</code> looks
-        like this:
+      <p className="news-lede">
+        The room reads the tabs in{" "}
+        <code className="news-code">NEWS_GOOGLE_SHEET_ID</code> whose names start
+        with a month. Name one <code className="news-code">October 2026</code>{" "}
+        for a month in a specific year, or{" "}
+        <code className="news-code">OCT MASTER SHEET</code> for the sheet that is
+        kept up to date, which is read as the current year. Every other tab in
+        the workbook is left alone.
       </p>
 
       <div className="news-table-wrap" style={{ marginTop: 18 }}>
         <table className="news-table">
           <thead>
             <tr>
-              <th scope="col">Year</th>
-              <th scope="col">&lt;metric&gt;</th>
-              <th scope="col">…</th>
-              <th scope="col">Headline</th>
-              <th scope="col">Narrative</th>
-              <th scope="col">Source</th>
+              <th scope="col">week</th>
+              <th scope="col">Event type</th>
+              <th scope="col">date , time (ist)</th>
+              <th scope="col">actual</th>
+              <th scope="col">forcast</th>
+              <th scope="col">previous</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td>2025</td>
-              <td>110</td>
-              <td>…</td>
-              <td>What happened</td>
-              <td>A paragraph of context.</td>
-              <td>Reuters</td>
+              <td>Week 1</td>
+              <td>ISM Manufacturing PMI</td>
+              <td>Thu 1, 7:30 pm</td>
+              <td>54.5</td>
+              <td>54.8</td>
+              <td>54.6</td>
             </tr>
             <tr>
-              <td>2026</td>
-              <td>121</td>
-              <td>…</td>
-              <td>What happened next</td>
-              <td>A second month of detail.</td>
-              <td>Reuters</td>
+              <td />
+              <td>NFP (Sep)</td>
+              <td>Fri 2, 6:00 pm</td>
+              <td>29K</td>
+              <td>89K</td>
+              <td>133K</td>
             </tr>
           </tbody>
         </table>
@@ -95,23 +91,33 @@ export function NewsSheetSetup() {
 
       <ul className="news-notice-list" style={{ marginTop: 18 }}>
         <li>
-          <strong className="text-text">Year</strong> is required. It is read by
-          name, so a <code className="news-code">Year</code> heading works
-          wherever the column sits.
+          <code className="news-code">Event type</code> names the release. Every
+          row with a name is one event.
         </li>
         <li>
-          Every other numeric column becomes a figure. Add one in Sheets and it
-          appears here with no code change.
+          <code className="news-code">actual</code> is the figure that came in.
+          It is compared against <code className="news-code">forcast</code> — the
+          surprise — and against{" "}
+          <code className="news-code">previous</code>, the prior reading of the
+          same event, which is the month-on-month change.
         </li>
         <li>
-          <code className="news-code">Headline</code>,{" "}
-          <code className="news-code">Summary</code> and{" "}
-          <code className="news-code">Source</code> are optional but expected;
-          the aliases are documented in the README.
+          Columns are found by their heading, not their position, so the extra{" "}
+          <code className="news-code">US time</code> column some tabs carry is
+          harmless.
         </li>
         <li>
-          Month-on-month is read from the previous month&apos;s tab, so January
-          needs December&apos;s tab to have a row for the year before.
+          Year on year compares an event with the same event a year earlier, so
+          it fills in once a tab for that year exists —{" "}
+          <code className="news-code">July 2025</code> beside{" "}
+          <code className="news-code">July 2026</code>.
+        </li>
+        <li>
+          Figures may be written with a unit —{" "}
+          <code className="news-code">197K</code>,{" "}
+          <code className="news-code">4.20%</code>,{" "}
+          <code className="news-code">6,657 B</code> — and are shown back the way
+          they were written.
         </li>
       </ul>
     </div>

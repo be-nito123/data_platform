@@ -2,11 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getViewer } from "@/lib/access";
-import { findNewsEntry, getNewsArchive } from "@/lib/supabase/data/news";
+import {
+  NEWS_MONTH_NAMES,
+  NEWS_MONTH_SHORT,
+  getNewsArchive,
+  newsMonthsForYear,
+} from "@/lib/supabase/data/news";
 import NewsLocked from "@/components/news/NewsLocked";
-import NewsMonthCard from "@/components/news/NewsMonthCard";
-import NewsHeatmap from "@/components/news/NewsHeatmap";
 import { NewsWarnings } from "@/components/news/NewsNotices";
+import NewsHeatmap from "@/components/news/NewsHeatmap";
+import NewsMonthCard from "@/components/news/NewsMonthCard";
+import { formatNewsCount } from "@/lib/news/format";
 
 export async function generateMetadata({
   params,
@@ -38,7 +44,13 @@ export default async function NewsYearPage({
 
   if (!archive.years.includes(year)) notFound();
 
-  const entries = archive.entries.filter((entry) => entry.year === year);
+  const months = newsMonthsForYear(archive, year);
+  const byMonth = new Map(months.map((entry) => [entry.month, entry]));
+
+  const totalEvents = months.reduce(
+    (total, entry) => total + entry.counts.events,
+    0
+  );
 
   const yearIndex = archive.years.indexOf(year);
   // `years` is newest first, so the following index is the previous year.
@@ -61,67 +73,73 @@ export default async function NewsYearPage({
           <h1 className="news-title">{year}</h1>
 
           <p className="news-lede">
-            {entries.length === 12
-              ? "All twelve months recorded."
-              : `${entries.length} of 12 months recorded.`}{" "}
-            Month-on-month change is read from the previous month&apos;s tab, so
-            January is measured against December of {year - 1}.
+            {months.length === 12
+              ? "All twelve months recorded"
+              : `${formatNewsCount(months.length)} of 12 months recorded`}
+            , holding {formatNewsCount(totalEvents)} events. Month-on-month
+            change is the sheet&apos;s own previous reading, so it needs no
+            earlier tab; year-on-year appears once a tab for the same month of{" "}
+            {year - 1} exists.
           </p>
         </div>
       </section>
 
-      <div className="news-container" style={{ paddingTop: 32, paddingBottom: 72 }}>
+      <div
+        className="news-container"
+        style={{ paddingTop: 32, paddingBottom: 72 }}
+      >
         <NewsWarnings warnings={archive.warnings} />
 
         <div style={{ marginTop: archive.warnings.length ? 24 : 0 }}>
           <section>
             <div className="news-section-head">
               <h2 className="news-section-title">Movement by month</h2>
-              <span className="news-section-note">MoM %</span>
+              <span className="news-section-note">
+                Against the prior reading
+              </span>
             </div>
 
-            <NewsHeatmap year={year} entries={archive.entries} metrics={archive.metrics} />
+            <NewsHeatmap year={year} months={newsMonthsForYear(archive, year)} />
           </section>
 
           <section className="news-section">
             <div className="news-section-head">
               <h2 className="news-section-title">Months</h2>
               <span className="news-section-note">
-                {entries.length} / 12
+                {formatNewsCount(months.length)} of 12
               </span>
             </div>
 
             <div className="news-grid">
-              {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((month) => (
                 <NewsMonthCard
                   key={month}
                   year={year}
-                  month={month}
-                  entry={findNewsEntry(archive, year, month) ?? null}
+                  monthName={NEWS_MONTH_NAMES[month - 1]}
+                  monthShort={NEWS_MONTH_SHORT[month - 1]}
+                  entry={byMonth.get(month)}
                 />
               ))}
             </div>
           </section>
 
-          {(older !== undefined || newer !== undefined) && (
-            <nav className="news-pager" aria-label="Other years">
-              {older !== undefined ? (
-                <Link href={`/news/${older}`} className="news-pager-link">
-                  <span className="news-eyebrow is-muted">Previous</span>
-                  <span>{older}</span>
-                </Link>
-              ) : (
-                <span />
-              )}
+          <nav className="news-pager" aria-label="Other years">
+            {older !== undefined ? (
+              <Link href={`/news/${older}`} className="news-pager-link">
+                <span className="news-eyebrow is-muted">Previous</span>
+                <span>{older}</span>
+              </Link>
+            ) : (
+              <span />
+            )}
 
-              {newer !== undefined && (
-                <Link href={`/news/${newer}`} className="news-pager-link">
-                  <span className="news-eyebrow is-muted">Next</span>
-                  <span>{newer}</span>
-                </Link>
-              )}
-            </nav>
-          )}
+            {newer !== undefined && (
+              <Link href={`/news/${newer}`} className="news-pager-link">
+                <span className="news-eyebrow is-muted">Next</span>
+                <span>{newer}</span>
+              </Link>
+            )}
+          </nav>
         </div>
       </div>
     </>
