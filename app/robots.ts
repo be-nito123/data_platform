@@ -12,6 +12,8 @@ export default function robots(): MetadataRoute.Robots {
           "/api/",
           // Authenticated or token-bearing routes
           "/profile",
+          // Exclusive monthly news room — admin only
+          "/news",
           "/login",
           "/register",
           "/signup",
