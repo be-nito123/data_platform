@@ -22,7 +22,14 @@ function findInstrumentByCode(code: string) {
   );
 }
 
-export default function ProfilePage() {
+/**
+ * The profile screen.
+ *
+ * `isAdmin` is resolved on the server (see `page.tsx`) rather than here, so the
+ * one place that decides who is an administrator stays `lib/access.ts` and the
+ * admin-only doorways are never rendered for anyone else.
+ */
+export default function ProfileClient({ isAdmin }: { isAdmin: boolean }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
@@ -370,6 +377,41 @@ export default function ProfilePage() {
               )}
             </div>
           </div>
+
+          {/*
+            Operator tooling. Rendered only for administrators, and the news room
+            itself checks the same role server-side — this card is a doorway, not
+            the lock.
+          */}
+          {isAdmin && (
+            <div className="mt-4 overflow-hidden rounded-2xl border border-accent/40 bg-panel">
+              <div className="border-b border-border px-6 py-4">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-accent">
+                  Admin
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-5 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-[13px] font-semibold text-text">
+                    Monthly Data News
+                  </div>
+                  <p className="mt-1 max-w-xl text-[12px] leading-5 text-text-dim">
+                    What moved each month, and by how much — the month-on-month and
+                    year-on-year change for every figure. Kept off the public site and
+                    out of search engines.
+                  </p>
+                </div>
+
+                <Link
+                  href="/news"
+                  className="shrink-0 rounded-lg border border-accent bg-accent px-4 py-2.5 text-[12px] font-semibold text-white transition hover:border-accent-strong hover:bg-accent-strong"
+                >
+                  Open news room
+                </Link>
+              </div>
+            </div>
+          )}
 
           {/* SECURITY */}
           <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-panel">
