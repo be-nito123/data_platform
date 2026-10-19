@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getViewer } from "@/lib/access";
+import { canReadNews } from "@/lib/news-access";
 import { getNewsArchive } from "@/lib/supabase/data/news";
 import NewsLocked from "@/components/news/NewsLocked";
 import { NewsSheetSetup, NewsWarnings } from "@/components/news/NewsNotices";
@@ -19,7 +20,7 @@ export default async function NewsIndexPage() {
   */
   const viewer = await getViewer();
 
-  if (!viewer.isAdmin) {
+  if (!(await canReadNews(viewer))) {
     return <NewsLocked viewer={viewer} />;
   }
 

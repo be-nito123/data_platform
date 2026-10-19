@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getViewer } from "@/lib/access";
+import { canReadNews } from "@/lib/news-access";
 import {
   NEWS_MONTH_NAMES,
   findNewsMonth,
@@ -47,7 +48,7 @@ export default async function NewsMonthPage({ params }: { params: PageParams }) 
 
   const viewer = await getViewer();
 
-  if (!viewer.isAdmin) {
+  if (!(await canReadNews(viewer))) {
     return <NewsLocked viewer={viewer} />;
   }
 

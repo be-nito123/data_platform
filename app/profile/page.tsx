@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getViewer } from "@/lib/access";
+import { hasNewsAccess } from "@/lib/news-access";
 import ProfileClient from "./ProfileClient";
 
 export const metadata: Metadata = {
@@ -14,11 +15,13 @@ export const metadata: Metadata = {
  * A server shell around the profile screen.
  *
  * The screen itself stays a client component — it is interactive and reads the
- * browser session — but "is this viewer an administrator?" is a server question,
- * and `getViewer` is the one place that answers it.
+ * browser session — but "may this viewer open the news room?" is a server
+ * question, and the access helpers are the one place that answers it: an
+ * `admin` role passes, and so does a live news access cookie.
  */
 export default async function ProfilePage() {
   const viewer = await getViewer();
+  const canOpenNews = viewer.isAdmin || (await hasNewsAccess());
 
-  return <ProfileClient isAdmin={viewer.isAdmin} />;
+  return <ProfileClient canOpenNews={canOpenNews} />;
 }

@@ -152,6 +152,14 @@ locked screen and no sheet data is fetched at all. The section is deliberately
 absent from the site navigation, the sitemap, and every public surface; it is
 disallowed in `robots.txt` and carries `robots: { index: false, follow: false }`.
 
+Until every account carries that role, `NEWS_ACCESS_CODE` opens a second,
+temporary door: the locked screen takes the code, `/news/access` validates it in
+constant time and sets a signed, HttpOnly cookie for seven days, and
+`canReadNews` accepts either proof before any sheet is read. The code grants the
+news room and nothing else — it is not an admin session — and unsetting the
+variable removes the door entirely. See `lib/news-access.ts`; delete it, the
+route, and the form when the real role grant is in place.
+
 | Route                  | What it shows                                        |
 | ---------------------- | ---------------------------------------------------- |
 | `/news`                | The latest month, then the years on record           |

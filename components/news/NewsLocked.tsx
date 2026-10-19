@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { Viewer } from "@/lib/access";
+import { newsCodeEnabled } from "@/lib/news-access";
+import NewsAccessForm from "./NewsAccessForm";
 
 /*
   Shown instead of the news room when the viewer is not an admin.
@@ -7,6 +9,10 @@ import type { Viewer } from "@/lib/access";
   The important part is what this does NOT do: it never receives sheet data.
   The caller returns this before reading the spreadsheet, so a locked-out
   visitor has nothing to find in the page source or the network tab.
+
+  When a shared access code is configured, the form at the bottom is the
+  stopgap door — it posts to a route handler that sets a signed cookie, and
+  the page above re-runs its gate with that cookie in hand.
 */
 export default function NewsLocked({ viewer }: { viewer: Viewer }) {
   const signedIn = Boolean(viewer.userId);
@@ -55,6 +61,8 @@ export default function NewsLocked({ viewer }: { viewer: Viewer }) {
               Back to home
             </Link>
           </div>
+
+          <NewsAccessForm enabled={newsCodeEnabled()} />
         </div>
       </div>
     </div>

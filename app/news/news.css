@@ -607,6 +607,47 @@
   margin-top: 6px;
 }
 
+/* ---------- Temporary access-code door ---------- */
+
+.news-access-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 340px;
+  margin-top: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--color-border);
+}
+
+.news-access-row {
+  display: flex;
+  gap: 8px;
+}
+
+.news-access-input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg-elevated);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  color: var(--color-text);
+}
+
+.news-access-input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.news-access-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-danger, #e06c75);
+}
+
 /* ---------- Motion ---------- */
 
 @media (max-width: 720px) {

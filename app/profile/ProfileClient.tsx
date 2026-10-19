@@ -25,11 +25,15 @@ function findInstrumentByCode(code: string) {
 /**
  * The profile screen.
  *
- * `isAdmin` is resolved on the server (see `page.tsx`) rather than here, so the
- * one place that decides who is an administrator stays `lib/access.ts` and the
- * admin-only doorways are never rendered for anyone else.
+ * `canOpenNews` is resolved on the server (see `page.tsx`) rather than here, so
+ * the one place that decides who may enter the news room stays server-side and
+ * the doorway is never rendered for anyone else.
  */
-export default function ProfileClient({ isAdmin }: { isAdmin: boolean }) {
+export default function ProfileClient({
+  canOpenNews,
+}: {
+  canOpenNews: boolean;
+}) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
@@ -379,11 +383,10 @@ export default function ProfileClient({ isAdmin }: { isAdmin: boolean }) {
           </div>
 
           {/*
-            Operator tooling. Rendered only for administrators, and the news room
-            itself checks the same role server-side — this card is a doorway, not
-            the lock.
+            Operator tooling. The news room itself re-checks the same permission
+            server-side — this card is a doorway, not the lock.
           */}
-          {isAdmin && (
+          {canOpenNews && (
             <div className="mt-4 overflow-hidden rounded-2xl border border-accent/40 bg-panel">
               <div className="border-b border-border px-6 py-4">
                 <div className="text-[10px] uppercase tracking-[0.18em] text-accent">
