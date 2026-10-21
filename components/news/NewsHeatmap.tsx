@@ -50,7 +50,8 @@ export default function NewsHeatmap({
       if (!row) {
         row = {
           key: event.matchKey,
-          label: readableEventName(event.name),          cells: MONTHS.map(() => null),
+          label: readableEventName(event.name),
+          cells: MONTHS.map(() => null),
         };
 
         rows.set(event.matchKey, row);

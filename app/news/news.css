@@ -218,6 +218,20 @@
   width: 100%;
   min-width: 620px;
   border-collapse: collapse;
+  /* Every column sized before the first row is laid out, so a long event name
+     cannot shove the figures out of the columns above and below it. */
+  table-layout: fixed;
+}
+
+/* The name carries the slack; the eight numeric columns stay put. */
+.news-table thead th:first-child,
+.news-table tbody td:first-child {
+  width: 34%;
+}
+
+.news-table thead th:not(:first-child),
+.news-table tbody td:not(:first-child) {
+  width: 9.42%;
 }
 
 .news-table th {
@@ -231,6 +245,15 @@
   color: var(--color-text-muted);
   text-align: right;
   white-space: nowrap;
+}
+
+/*
+  Letterspacing adds its gap after the final character as well, which pushes a
+  right-aligned heading a few pixels off the column edge it is meant to sit on.
+  The padding restores it, so "ACTUAL" lines up with the numbers underneath.
+*/
+.news-table th:not(:first-child) {
+  padding-right: calc(16px + 0.12em);
 }
 
 .news-table th:first-child {
@@ -281,6 +304,9 @@
   padding: 9px 16px;
   background: var(--color-bg-elevated);
   font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: none;
   color: var(--color-text-dim);
   text-align: left;
 }

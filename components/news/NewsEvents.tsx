@@ -89,7 +89,7 @@ function WeekRows({ week }: { week: NewsWeek }) {
   return (
     <>
       <tr className="news-table-week">
-        <th scope="colgroup" colSpan={EVENT_COLUMNS}>
+        <th scope="row" colSpan={EVENT_COLUMNS}>
           {week.label}
         </th>
       </tr>
@@ -99,6 +99,21 @@ function WeekRows({ week }: { week: NewsWeek }) {
       ))}
     </>
   );
+}
+
+/**
+ * A comparison cell — Surprise, MoM, YoY.
+ *
+ * `changeClass` carries the direction colour; an empty one is also marked
+ * `is-empty` so a missing figure reads as missing rather than as a figure of
+ * zero. Without that, YoY (blank until a tab for the earlier year exists)
+ * rendered as brightly as a real reading.
+ */
+function changeCellClass(value: NewsEvent["surprise"]): string {
+  const classes = [changeClass(value)];
+  if (!value) classes.push("is-empty");
+
+  return classes.filter(Boolean).join(" ");
 }
 
 function EventRow({ event }: { event: NewsEvent }) {
@@ -128,13 +143,17 @@ function EventRow({ event }: { event: NewsEvent }) {
         {formatNewsValue(event.previous)}
       </td>
 
-      <td className={changeClass(event.surprise)}>
+      <td className={changeCellClass(event.surprise)}>
         {formatNewsDelta(event.surprise)}
       </td>
 
-      <td className={changeClass(event.mom)}>{formatNewsDelta(event.mom)}</td>
+      <td className={changeCellClass(event.mom)}>
+        {formatNewsDelta(event.mom)}
+      </td>
 
-      <td className={changeClass(event.yoy)}>{formatNewsDelta(event.yoy)}</td>
+      <td className={changeCellClass(event.yoy)}>
+        {formatNewsDelta(event.yoy)}
+      </td>
     </tr>
   );
 }
