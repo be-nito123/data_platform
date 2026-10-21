@@ -15,6 +15,8 @@ import assert from "node:assert/strict";
 import {
   buildNewsArchive,
   findNewsMonth,
+  findNewsRelease,
+  newsReleaseSlug,
   newsTrendWindow,
 } from "../lib/supabase/data/news-sheet.ts";
 import { planForMonth, readOf } from "../lib/news/trading-read.ts";
@@ -848,6 +850,132 @@ function approx(actual: number | null | undefined, expected: number) {
   */
   const plan = planForMonth(june!);
   assert.equal(plan.firmer + plan.softer + plan.flat, plan.reads.length);
+}
+
+/* =========================================================
+   ONE RELEASE, EVERY RECORDING
+   ========================================================= */
+
+{
+  /*
+    The release page is reached from two places — a heatmap cell and a month
+    table's event name — and both build the link with `newsReleaseSlug`, the
+    same function the page's lookup matches against. One slug, two ends: a
+    click on a number cannot land on a 404 or, worse, on another release's
+    history. The history itself runs oldest first, and the page's title takes
+    the newest spelling the sheets used for it.
+  */
+  const history = buildNewsArchive(
+    [
+      {
+        tab: "SEP 2026",
+        rows: [
+          HEADER,
+          ["Week 1", "CPI (YoY)", "Tue 1, 6:00 pm", "3.40%", "3.40%", "3.60%"],
+          ["", "Initial Jobless Claims", "Thu 4, 6:00 pm", "220K", "215K", "240K"],
+          // Claims print every week: two rows, two releases of one series.
+          ["", "Initial Jobless Claims", "Thu 11, 6:00 pm", "210K", "215K", "220K"],
+          ["", "NFP", "Fri 5, 6:00 pm", "162K", "55K", "21K"],
+          ["", "NFP (Aug)", "Fri 5, 6:00 pm", "162K", "55K", "21K"],
+        ],
+      },
+      {
+        tab: "OCTOBER GOLD REPORT",
+        rows: [
+          ["ELITE CAPITAL - GOLD MACRO REPORT | OCTOBER 2026"],
+          [],
+          [
+            "Week",
+            "News Event",
+            "Release Date",
+            "Release Time (IST)",
+            "Actual",
+            "Forecast",
+            "Previous",
+          ],
+          ["Week 1", "Consumer Price Index (CPI YoY)", "2026-10-01", "6:00 PM IST", "3.70%", "3.60%", "3.40%"],
+        ],
+      },
+    ],
+    2026
+  );
+
+  // The slug: from the match key, from the name alone, and a last resort.
+  assert.equal(newsReleaseSlug("non farm payrolls", "NFP"), "non-farm-payrolls");
+  assert.equal(
+    newsReleaseSlug("", "Consumer Price Index (CPI YoY)"),
+    "consumer-price-index-cpi-yoy"
+  );
+  assert.equal(newsReleaseSlug("", ""), "event");
+
+  // Both spellings of CPI lead to the same page, because both slug from one key.
+  const cpi = findNewsRelease(history, newsReleaseSlug("cpi yoy", "CPI (YoY)"));
+  assert.ok(cpi, "the heatmap's own link must resolve");
+  assert.equal(cpi?.key, "cpi-yoy");
+
+  // Oldest first — a history is read forwards — and the newest spelling wins
+  // the title, since that is the one the current workbook writes.
+  assert.deepEqual(
+    cpi?.entries.map((entry) => `${entry.year}-${entry.month}`),
+    ["2026-9", "2026-10"]
+  );
+  assert.equal(cpi?.entries[0].event.name, "CPI (YoY)");
+  assert.equal(
+    cpi?.name,
+    "Consumer Price Index (CPI YoY)",
+    "the newest spelling titles the page"
+  );
+  assert.ok(
+    cpi?.entries.every((entry) => entry.event.matchKey === "cpi yoy"),
+    "one page, one key — the rows differ only in spelling"
+  );
+
+  // The anchor a heatmap cell appends ("#2026-09") must be the month heading's id.
+  assert.equal(
+    `${cpi?.entries[0].year}-${cpi?.entries[0].monthSlug}`,
+    "2026-09"
+  );
+
+  /*
+    Weekly releases keep every print of a single-tab month: two claims rows are
+    two Thursdays, not one duplicated row. The page must show both.
+  */
+  const claims = findNewsRelease(
+    history,
+    newsReleaseSlug("initial jobless claims", "Initial Jobless Claims")
+  );
+  assert.equal(
+    claims?.entries.length,
+    2,
+    "weekly claims are two separate prints"
+  );
+
+  /*
+    And the pair that must never merge: this month's payrolls against last
+    month's, held apart all the way to the route.
+  */
+  const nfp = findNewsRelease(history, "non-farm-payrolls");
+  const nfpAug = findNewsRelease(history, "nfp-aug");
+  assert.equal(nfp?.entries.length, 1, "\"NFP\" may not absorb \"NFP (Aug)\"");
+  assert.equal(nfpAug?.entries.length, 1);
+  assert.equal(nfp?.name, "NFP");
+  assert.equal(nfpAug?.name, "NFP (Aug)");
+
+  // Every link the month tables build resolves against the main fixture —
+  // the round trip that would catch a slug the page cannot look up.
+  for (const month of archive.months) {
+    for (const event of month.events) {
+      const slug = newsReleaseSlug(event.matchKey, event.name);
+      assert.ok(
+        findNewsRelease(archive, slug),
+        `no release page for "${event.name}" (${slug})`
+      );
+    }
+  }
+
+  // An unknown key is undefined, so the route 404s rather than showing the
+  // nearest release it does know.
+  assert.equal(findNewsRelease(history, "crude-oil-inventories"), undefined);
 }
 
 /* ========================================================= */

@@ -1,8 +1,11 @@
+import type { ReactNode } from "react";
+import Link from "next/link";
 import type {
   NewsEvent,
   NewsMonth,
   NewsWeek,
 } from "@/lib/supabase/data/news";
+import { newsReleaseSlug } from "@/lib/supabase/data/news";
 import {
   changeClass,
   formatContracts,
@@ -127,7 +130,17 @@ function EventRow({ event }: { event: NewsEvent }) {
   return (
     <tr>
       <td>
-        <span className="news-event-name">{event.name}</span>
+        {/*
+          The name leads to this release's own page — its whole history, and
+          where the read lives now. The table shows one month; the link is the
+          way out to the series.
+        */}
+        <Link
+          className="news-event-name"
+          href={`/news/releases/${newsReleaseSlug(event.matchKey, event.name)}`}
+        >
+          {event.name}
+        </Link>
 
         {event.notes && (
           <span className="news-label news-event-note">{event.notes}</span>
@@ -199,19 +212,7 @@ export function NewsReactions({ weeks }: { weeks: NewsWeek[] }) {
   return (
     <div className="news-table-wrap">
       <table className="news-table news-table-gold">
-        <thead>
-          <tr>
-            <th scope="col">Event</th>
-            <th scope="col">Candle open</th>
-            <th scope="col">Event day O/C</th>
-            <th scope="col">Event volume</th>
-            <th scope="col">Event OI</th>
-            <th scope="col">Next day</th>
-            <th scope="col">Next day O/C</th>
-            <th scope="col">Next volume</th>
-            <th scope="col">Next OI</th>
-          </tr>
-        </thead>
+        <ReactionHead />
 
         <tbody>
           {weeksWithReactions.map((week, index) => (
@@ -220,6 +221,67 @@ export function NewsReactions({ weeks }: { weeks: NewsWeek[] }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * The same figures for a flat list — one release's whole history, where the
+ * rows are months rather than weeks. `label` decides what the first column
+ * says: a month name on the release page, the event's name in a month.
+ */
+export function NewsReactionTable({
+  events,
+  label,
+  keyOf,
+  firstHeading = "Event",
+}: {
+  events: NewsEvent[];
+  label?: (event: NewsEvent) => ReactNode;
+  /**
+   * A key per row. `event.key` is unique within a month, but the release page
+   * spans months, where the same key recurs — so it brings its own.
+   */
+  keyOf?: (event: NewsEvent) => string;
+  /** What the first column says — "Event" in a month, "Month" on a release. */
+  firstHeading?: string;
+}) {
+  const withGold = events.filter((event) => event.reaction);
+  if (withGold.length === 0) return null;
+
+  return (
+    <div className="news-table-wrap">
+      <table className="news-table news-table-gold">
+        <ReactionHead firstHeading={firstHeading} />
+
+        <tbody>
+          {withGold.map((event) => (
+            <ReactionRow
+              key={keyOf?.(event) ?? event.key}
+              event={event}
+              label={label?.(event)}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ReactionHead({ firstHeading = "Event" }: { firstHeading?: string }) {
+  return (
+    <thead>
+      <tr>
+        <th scope="col">{firstHeading}</th>
+        <th scope="col">Candle open</th>
+        <th scope="col">Event day O/C</th>
+        <th scope="col">Event volume</th>
+        <th scope="col">Event OI</th>
+        <th scope="col">Next day</th>
+        <th scope="col">Next day O/C</th>
+        <th scope="col">Next volume</th>
+        <th scope="col">Next OI</th>
+      </tr>
+    </thead>
   );
 }
 
@@ -246,14 +308,20 @@ function ReactionWeek({
 /** Event, candle open, event day O/C, volume, OI, next day, O/C, volume, OI. */
 const GOLD_COLUMNS = 9;
 
-function ReactionRow({ event }: { event: NewsEvent }) {
+function ReactionRow({
+  event,
+  label,
+}: {
+  event: NewsEvent;
+  label?: ReactNode;
+}) {
   const gold = event.reaction;
   if (!gold) return null;
 
   return (
     <tr>
       <td>
-        <span className="news-event-name">{event.name}</span>
+        {label ?? <span className="news-event-name">{event.name}</span>}
       </td>
 
       <td className={gold.candleOpen === null ? "is-empty" : ""}>

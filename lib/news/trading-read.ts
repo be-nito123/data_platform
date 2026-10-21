@@ -317,34 +317,8 @@ function summarize(reads: TradingRead[]): MonthPlan {
 }
 
 /* =========================================================
-   THE YEAR'S PLAN
+   A SURPRISE THAT DIFFERENT UNITS CAN SHARE
    ========================================================= */
-
-export type YearPlan = {
-  /** One plan per month that had anything to read, in sheet order. */
-  months: { month: NewsMonth; plan: MonthPlan }[];
-  /** The year aggregated, for the headline. */
-  total: MonthPlan;
-};
-
-/**
- * Every month of the year that printed a readable release, with the year's own
- * totals alongside.
- *
- * The year page is where the months sit next to each other, so the reads are
- * kept per month rather than merged into one list: a firmer dollar in April and
- * a softer one in October are two facts, not one average.
- */
-export function planForYear(months: NewsMonth[]): YearPlan {
-  const perMonth = months
-    .map((month) => ({ month, plan: planForMonth(month) }))
-    .filter((entry) => entry.plan.reads.length > 0);
-
-  return {
-    months: perMonth,
-    total: summarize(perMonth.flatMap((entry) => entry.plan.reads)),
-  };
-}
 
 /**
  * A surprise as a fraction of its forecast, so unlike units can be ranked.
@@ -364,12 +338,10 @@ function relativeSurprise(event: NewsEvent): number {
 }
 
 /**
- * The reads for a set of events, strongest surprise first.
- *
- * `planForMonth` is the month-shaped caller; this is the one the month page
- * uses for a single week's rows.
+ * The reads for a set of events, strongest surprise first — what `planForMonth`
+ * summarises, and what the release page tallies the same way for one series.
  */
-export function readsForEvents(events: NewsEvent[]): TradingRead[] {
+function readsForEvents(events: NewsEvent[]): TradingRead[] {
   const reads: TradingRead[] = [];
 
   for (const event of events) {

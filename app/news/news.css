@@ -336,10 +336,76 @@
   width: 9.25%;
 }
 
+/*
+  The release page's history: one release, every month it printed. The first
+  column is a date, not a name, so it takes much less of the row than the month
+  tables give theirs — the point of the table is the figures beside it.
+*/
+
+.news-table-release {
+  min-width: 760px;
+}
+
+.news-table-release thead th:first-child,
+.news-table-release tbody td:first-child {
+  width: 16%;
+}
+
+.news-table-release thead th:not(:first-child),
+.news-table-release tbody td:not(:first-child) {
+  width: 12%;
+}
+
+/* The read column: the chip, and underneath it the surprise it came from. */
+.news-table .news-release-read .news-plan-against {
+  display: block;
+  margin-top: 3px;
+}
+
+/* The month heading, which links out to that month's own page. */
+.news-table-week .news-release-month {
+  color: inherit;
+  text-decoration: none;
+}
+
+.news-table-week .news-release-month:hover {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/*
+  A heatmap click lands on a month heading through "#2026-10". Keep the row
+  clear of the top of the window and light it up, so the click leaves a mark
+  rather than quietly disappearing under the fold.
+*/
+
+.news-table .news-table-week th[id] {
+  scroll-margin-top: 24px;
+}
+
+.news-table .news-table-week th:target {
+  background: color-mix(in srgb, var(--color-accent) 16%, var(--color-bg-elevated));
+  color: var(--color-text);
+}
+
+.news-table .news-table-week th:target .news-release-month {
+  color: var(--color-accent);
+}
+
 /* The release's name, then anything the sheet said about it underneath. */
 
 .news-event-name {
   display: block;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+/* The name leads to the release's page — the one affordance in the table. */
+a.news-event-name:hover {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .news-event-note {
@@ -481,6 +547,19 @@
   background: var(--color-panel);
 }
 
+/* The row's name leads to the release's history — the cells below lead to the
+   same page at one month, so the whole row has one destination. */
+.news-heatmap .news-heatmap-row-label a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.news-heatmap .news-heatmap-row-label a:hover {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .news-heatmap-cell {
   display: flex;
   align-items: center;
@@ -529,166 +608,12 @@
 
 /* ---------- The read ---------- */
 
-.news-plan {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  padding: 18px;
-  border: 1px solid var(--color-border);
-  border-radius: 14px;
-  background: var(--color-panel);
-}
-
-.news-plan-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.news-plan-headline {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--color-text);
-}
-
-.news-plan-sub {
-  margin: 6px 0 0;
-  max-width: 62ch;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--color-text-dim);
-}
-
-.news-plan-badge {
-  flex: none;
-  padding: 4px 11px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-
-.news-plan-badge.is-firm {
-  border-color: color-mix(in srgb, var(--color-green) 45%, transparent);
-  background: color-mix(in srgb, var(--color-green) 12%, transparent);
-  color: var(--color-green);
-}
-
-.news-plan-badge.is-soft {
-  border-color: color-mix(in srgb, var(--color-red) 45%, transparent);
-  background: color-mix(in srgb, var(--color-red) 12%, transparent);
-  color: var(--color-red);
-}
-
-.news-plan-months {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-}
-
-.news-plan-month {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 14px;
-  border-top: 1px solid var(--color-border);
-}
-
-.news-plan-month-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.news-plan-month-name {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-.news-plan-month-count {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--color-text-dim);
-}
-
-.news-plan-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.news-plan-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 11px 12px;
-  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
-  border-radius: 10px;
-  background: var(--color-bg-elevated);
-}
-
-.news-plan-row-main {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.news-plan-event {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-/* The release family the read was resolved through. */
-.news-plan-family {
-  flex: none;
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-.news-plan-figures {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.news-plan-actual {
-  color: var(--color-text);
-}
-
-.news-plan-forecast {
-  color: var(--color-text-muted);
-}
-
-.news-plan-read {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
+/*
+  The read lives on a release's page now — one chip per recording, said once
+  rather than repeated down every month — so the rules here are the chip's
+  alone. Everything that used to lay the interpretation out as its own section
+  went with it.
+*/
 
 .news-plan-chip {
   display: inline-flex;
@@ -725,60 +650,6 @@
 .news-plan-against {
   font-size: 11px;
   color: var(--color-text-dim);
-}
-
-.news-plan-why {
-  margin: 0;
-  font-size: 11.5px;
-  line-height: 1.6;
-  color: var(--color-text-dim);
-}
-
-.news-plan-market {
-  color: var(--color-text-muted);
-}
-
-.news-plan-foot {
-  margin: 0;
-  padding-top: 12px;
-  border-top: 1px solid var(--color-border);
-  font-size: 11px;
-  line-height: 1.6;
-  color: var(--color-text-muted);
-}
-
-/* The compact read list on the month page. */
-
-.news-reads {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border: 1px solid var(--color-border);
-  border-radius: 14px;
-  background: var(--color-panel);
-  overflow: hidden;
-}
-
-.news-reads-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) auto minmax(0, 1.6fr);
-  align-items: center;
-  gap: 12px;
-  padding: 11px 16px;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
-}
-
-.news-reads-row:last-child {
-  border-bottom: none;
-}
-
-.news-reads-why {
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--color-text-muted);
 }
 
 /* ---------- Pager ---------- */
@@ -974,18 +845,6 @@
   .news-metric,
   .news-card {
     padding: 15px;
-  }
-
-  /*
-    The three-part read row needs its own column layout once there is no room
-    to sit across: event, then lean, then the why underneath.
-  */
-  .news-reads-row {
-    grid-template-columns: 1fr auto;
-  }
-
-  .news-reads-why {
-    grid-column: 1 / -1;
   }
 }
 

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getSheetData, listSheetTitles } from "@/lib/supabase/google/sheets";
 import {
   buildNewsArchive,
@@ -71,7 +72,13 @@ function currentYear(): number {
   return new Date().getFullYear();
 }
 
-export async function getNewsArchive(): Promise<NewsArchive> {
+/*
+  One read per request, however many times it is asked for: the page and its
+  `generateMetadata` both need the archive, and each read lists two
+  spreadsheets and fetches every month tab. React's cache is request-scoped, so
+  nothing is memoised across requests — only within this render.
+*/
+export const getNewsArchive = cache(async (): Promise<NewsArchive> => {
   const spreadsheetIds = newsSpreadsheetIds();
   const fallbackYear = currentYear();
 
@@ -156,4 +163,4 @@ export async function getNewsArchive(): Promise<NewsArchive> {
   }
 
   return buildNewsArchive(grids, fallbackYear, warnings);
-}
+});

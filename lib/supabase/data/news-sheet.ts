@@ -673,7 +673,15 @@ export function normalizeEventName(name: string): string {
 }
 
 function slugify(value: string): string {
-  return value.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  // Lowercased because the fallbacks above pass raw sheet text ("Consumer
+  // Price Index (CPI YoY)"), and uppercase letters are not [a-z0-9] — without
+  // this every capital would land as a dash and the slug would read
+  // "onsumer-rice-ndex-o". Match keys are already lowercase, so they are
+  // unaffected.
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 /** "NFP (Sep)" reads as "NFP" once it is a heading rather than a sheet row. */
@@ -1396,6 +1404,84 @@ export function buildNewsArchive(
   );
 
   return { months, years, warnings };
+}
+
+/* =========================================================
+   RELEASES
+   ========================================================= */
+
+/**
+ * One release, every time the archive records it.
+ *
+ * The two workbooks spell releases differently, so `matchKey` is what makes a
+ * single page possible: "CPI (YoY)" and "Consumer Price Index (CPI YoY)" are
+ * two rows of one history. The page keeps the newest spelling for its title and
+ * every entry's own name for its table.
+ */
+export type NewsRelease = {
+  /** The route segment: the match key as a slug. */
+  key: string;
+  matchKey: string;
+  /** The release as the most recent sheet spells it — the page's title. */
+  name: string;
+  /** Every appearance, oldest first. */
+  entries: NewsReleaseEntry[];
+};
+
+export type NewsReleaseEntry = {
+  year: number;
+  month: number;
+  monthName: string;
+  monthShort: string;
+  monthSlug: string;
+  /** The tab the month was read from, merged or not. */
+  tab: string;
+  /** The release as *that* month's sheet wrote it. */
+  event: NewsEvent;
+};
+
+/** The URL segment for a release: "Consumer Price Index (CPI YoY)" → "cpi-yoy". */
+export function newsReleaseSlug(matchKey: string, name: string): string {
+  return slugify(matchKey) || slugify(name) || "event";
+}
+
+/**
+ * Find one release across the whole archive, for `/news/releases/[key]`.
+ *
+ * Matched by slug so the route stays readable — the key itself ("cpi yoy") is
+ * not URL material — and months come back oldest first because a history is
+ * read forwards. A matchKey that appears more than once in one month (claims
+ * run weekly) keeps every occurrence: each is a separate release of the series.
+ */
+export function findNewsRelease(
+  archive: NewsArchive,
+  key: string
+): NewsRelease | undefined {
+  const entries: NewsReleaseEntry[] = [];
+  let matchKey = "";
+  let name = "";
+
+  for (const month of archive.months) {
+    for (const event of month.events) {
+      if (newsReleaseSlug(event.matchKey, event.name) !== key) continue;
+
+      entries.push({
+        year: month.year,
+        month: month.month,
+        monthName: month.monthName,
+        monthShort: month.monthShort,
+        monthSlug: month.monthSlug,
+        tab: month.tab,
+        event,
+      });
+
+      // Months are oldest first, so the newest spelling wins the title.
+      matchKey = event.matchKey;
+      name = event.name;
+    }
+  }
+
+  return entries.length > 0 ? { key, matchKey, name, entries } : undefined;
 }
 
 /* =========================================================

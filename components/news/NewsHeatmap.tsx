@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   NEWS_MONTH_SHORT,
+  newsReleaseSlug,
   readableEventName,
   type NewsValue,
   type NewsMonth,
@@ -60,8 +61,17 @@ export default function NewsHeatmap({
         rows.set(event.matchKey, row);
       }
 
+      /*
+        A cell links to the release's own history, anchored at this month: the
+        read lives there now, and clicking a number should lead to what that
+        number means and how it has printed before. The month itself is one
+        hop further, from the anchor row on that page.
+      */
       row.cells[month.month - 1] = {
-        href: `/news/${year}/${month.monthSlug}`,
+        href: `/news/releases/${newsReleaseSlug(
+          event.matchKey,
+          event.name
+        )}#${year}-${month.monthSlug}`,
         delta: event.mom,
       };
     }
@@ -117,7 +127,14 @@ export default function NewsHeatmap({
           {filled.map((row) => (
             <tr key={row.key}>
               <th scope="row" className="news-heatmap-row-label">
-                {row.label}
+                {/* The name opens this release's whole history — the read for
+                    the series, every month it printed in. The cells open the
+                    same page at one month. */}
+                <Link
+                  href={`/news/releases/${newsReleaseSlug(row.key, row.full)}`}
+                >
+                  {row.label}
+                </Link>
               </th>
 
               {MONTHS.map((month, index) => {
@@ -139,7 +156,7 @@ export default function NewsHeatmap({
                         cell.delta
                           ? `${formatNewsDelta(cell.delta)} on the prior reading`
                           : "no prior reading"
-                      }`}
+                      } — opens this release's history at ${entry.monthName}`}
                     >
                       {cell.delta ? formatNewsDelta(cell.delta) : "—"}
                     </Link>
@@ -154,7 +171,9 @@ export default function NewsHeatmap({
       <p className="news-heatmap-caption">
         Month on month, against the sheet&apos;s own prior reading. Green rose,
         red fell, and the figure is the move in the event&apos;s own unit — so
-        two cells cannot be ranked against each other, only read in place.
+        two cells cannot be ranked against each other, only read in place. A
+        cell opens that release&apos;s history at the month you clicked; its
+        name opens all of it, where the read lives.
       </p>
     </div>
   );

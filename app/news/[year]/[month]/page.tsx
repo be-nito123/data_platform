@@ -14,7 +14,6 @@ import {
 import NewsLocked from "@/components/news/NewsLocked";
 import { NewsWarnings } from "@/components/news/NewsNotices";
 import { NewsMonthSummary, NewsEventsTable, NewsReactions } from "@/components/news/NewsEvents";
-import { NewsWeekReads } from "@/components/news/NewsTradingPlan";
 import MetricTrendChart, {
   type TrendSeries,
 } from "@/components/news/MetricTrendChart";
@@ -207,17 +206,6 @@ export default async function NewsMonthPage({ params }: { params: PageParams }) 
               From the gold report&apos;s OHLCV block. A dash means the sheet has
               not filled that cell in yet — it is not a price of zero.
             </p>
-          </section>
-
-          <section className="news-section">
-            <div className="news-section-head">
-              <h2 className="news-section-title">The read</h2>
-              <span className="news-section-note">
-                Surprise against forecast
-              </span>
-            </div>
-
-            <NewsWeekReads weeks={entry.weeks} />
           </section>
 
           <section className="news-section">

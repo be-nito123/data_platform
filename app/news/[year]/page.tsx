@@ -13,7 +13,6 @@ import NewsLocked from "@/components/news/NewsLocked";
 import { NewsWarnings } from "@/components/news/NewsNotices";
 import NewsHeatmap from "@/components/news/NewsHeatmap";
 import NewsMonthCard from "@/components/news/NewsMonthCard";
-import NewsTradingPlan from "@/components/news/NewsTradingPlan";
 import { formatNewsCount } from "@/lib/news/format";
 
 export async function generateMetadata({
@@ -102,17 +101,6 @@ export default async function NewsYearPage({
             </div>
 
             <NewsHeatmap year={year} months={newsMonthsForYear(archive, year)} />
-          </section>
-
-          <section className="news-section">
-            <div className="news-section-head">
-              <h2 className="news-section-title">The read</h2>
-              <span className="news-section-note">
-                Surprise against forecast
-              </span>
-            </div>
-
-            <NewsTradingPlan months={months} />
           </section>
 
           <section className="news-section">
