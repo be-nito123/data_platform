@@ -131,15 +131,10 @@ export default function NewsHeatmap({
         </tbody>
       </table>
 
-      <p className="news-heatmap-legend">
-        <span className="news-heatmap-swatch is-up" />
-        Rose
-        <span className="news-heatmap-swatch is-down" />
-        Fell
-        <span className="news-label">
-          Month on month, against the prior reading. Cells show the move in the
-          event&apos;s own unit.
-        </span>
+      <p className="news-heatmap-caption">
+        Month on month, against the sheet&apos;s own prior reading. Green rose,
+        red fell, and the figure is the move in the event&apos;s own unit — so
+        two cells cannot be ranked against each other, only read in place.
       </p>
     </div>
   );

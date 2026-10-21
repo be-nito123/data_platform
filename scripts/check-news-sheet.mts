@@ -17,6 +17,7 @@ import {
   findNewsMonth,
   newsTrendWindow,
 } from "../lib/supabase/data/news-sheet.ts";
+import { planForMonth, readOf } from "../lib/news/trading-read.ts";
 
 const HEADER = [
   "week",
@@ -341,6 +342,85 @@ function approx(actual: number | null | undefined, expected: number) {
 
   // The displayed name is untouched by the normalization.
   assert.equal(byKey.get("ism manufacturing")?.name, "ISM Manufacturing PMI");
+}
+
+/* =========================================================
+   THE TRADING READ
+   ========================================================= */
+
+{
+  /*
+    The read resolves the direction of a surprise through the release's family,
+    because the same word means opposite things on different releases: a payrolls
+    beat is a hotter labour market, a claims beat is a colder one. Getting that
+    backwards would be the worst kind of wrong — a confident, inverted call — so
+    the two labour directions are pinned here.
+  */
+  const direction = buildNewsArchive(
+    [
+      {
+        tab: "JUN 2026",
+        rows: [
+          HEADER,
+          ["Week 1", "NFP", "Fri 5, 6:00 pm", "300K", "200K", "180K"],
+          ["", "Initial Jobless Claims", "Thu 4, 6:00 pm", "250K", "200K", "195K"],
+          ["", "Unemployment Rate", "Fri 5, 6:00 pm", "4.5%", "4.2%", "4.2%"],
+          ["", "CPI (YoY)", "Wed 10, 6:00 pm", "3.0%", "3.5%", "3.6%"],
+          ["", "ISM Manufacturing PMI", "Mon 1, 7:30 pm", "50.0", "50.0", "49.0"],
+        ],
+      },
+    ],
+    2026
+  );
+
+  const june = findNewsMonth(direction, 2026, 6);
+  assert.ok(june, "June 2026 missing from the trading-read fixture");
+
+  const byKey = new Map((june?.events ?? []).map((event) => [event.matchKey, event]));
+
+  /** The read for one of the fixture events, refusing a missing one. */
+  const read = (key: string) => {
+    const event = byKey.get(key);
+    assert.ok(event, "no event " + key + " in the fixture");
+    const result = readOf(event);
+    assert.ok(result, "no read for " + key);
+    return result;
+  };
+
+  // A payrolls beat is a hotter labour market → the dollar firms.
+  const payrolls = read("nfp");
+  assert.equal(payrolls.against, "above");
+  assert.equal(payrolls.lean, "firmer", "a payrolls beat must firm the dollar");
+
+  /*
+    A claims beat is the opposite: more people filed, so labour is looser and the
+    dollar softens. This is the assertion that would have caught the inversion
+    where claims were read like payrolls.
+  */
+  const claims = read("initial jobless claims");
+  assert.equal(claims.against, "above");
+  assert.equal(claims.lean, "softer", "a claims beat must soften the dollar, not firm it");
+  assert.equal(claims.family, "labour-loose");
+
+  // A higher unemployment rate is also looser labour.
+  const unemployment = read("unemployment rate");
+  assert.equal(unemployment.lean, "softer");
+  assert.equal(unemployment.family, "labour-loose");
+
+  // A cooler inflation print firms risk appetite → softer dollar.
+  assert.equal(read("cpi").lean, "softer");
+
+  // An in-line print is flat, neither firmer nor softer.
+  const ism = read("ism manufacturing");
+  assert.equal(ism.against, "in-line");
+  assert.equal(ism.lean, "neutral");
+
+  /*
+    The three headline counts must equal the number of reads, so the summary line
+    and the chips can never disagree.
+  */
+  const plan = planForMonth(june!);
+  assert.equal(plan.firmer + plan.softer + plan.flat, plan.reads.length);
 }
 
 /* ========================================================= */

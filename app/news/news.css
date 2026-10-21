@@ -402,6 +402,24 @@
   min-width: 720px;
   border-collapse: separate;
   border-spacing: 0;
+  /*
+    Fixed columns, for the same reason the events table needs them: event names
+    are not the same length ("Average Hourly Earnings" against "Core PCE"), and
+    auto layout would size the label column twelve different ways down one
+    table, leaving the months out of line with their own headings.
+  */
+  table-layout: fixed;
+}
+
+/* The label takes the slack; the twelve months are equal and fixed. */
+.news-heatmap thead th:first-child,
+.news-heatmap tbody th:first-child {
+  width: 22%;
+}
+
+.news-heatmap thead th:not(:first-child),
+.news-heatmap tbody td {
+  width: 6.5%;
 }
 
 .news-heatmap th {
@@ -429,8 +447,17 @@
   font-size: 11.5px;
   color: var(--color-text-dim);
   text-align: left;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   border: none;
+  /*
+    Scrolling the twelve months sideways used to lose track of which event the
+    row belonged to. The label rides along with the scroll instead.
+  */
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-panel);
 }
 
 .news-heatmap-cell {
@@ -444,6 +471,7 @@
   font-variant-numeric: tabular-nums;
   color: var(--color-text);
   text-decoration: none;
+  overflow: hidden;
 }
 
 .news-heatmap-cell.is-empty {
@@ -471,28 +499,265 @@
   background: color-mix(in srgb, var(--color-border) 30%, transparent);
 }
 
-.news-heatmap-legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-top: 12px;
+.news-heatmap-caption {
+  margin: 12px 0 0;
   font-size: 11px;
+  line-height: 1.6;
   color: var(--color-text-muted);
 }
 
-.news-heatmap-swatch {
-  width: 14px;
-  height: 10px;
-  border-radius: 3px;
+/* ---------- The read ---------- */
+
+.news-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-panel);
 }
 
-.news-heatmap-swatch.is-up {
-  background: var(--color-green);
+.news-plan-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.news-heatmap-swatch.is-down {
-  background: var(--color-red);
+.news-plan-headline {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.news-plan-sub {
+  margin: 6px 0 0;
+  max-width: 62ch;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text-dim);
+}
+
+.news-plan-badge {
+  flex: none;
+  padding: 4px 11px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.news-plan-badge.is-firm {
+  border-color: color-mix(in srgb, var(--color-green) 45%, transparent);
+  background: color-mix(in srgb, var(--color-green) 12%, transparent);
+  color: var(--color-green);
+}
+
+.news-plan-badge.is-soft {
+  border-color: color-mix(in srgb, var(--color-red) 45%, transparent);
+  background: color-mix(in srgb, var(--color-red) 12%, transparent);
+  color: var(--color-red);
+}
+
+.news-plan-months {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.news-plan-month {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.news-plan-month-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.news-plan-month-name {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.news-plan-month-count {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--color-text-dim);
+}
+
+.news-plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.news-plan-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: 10px;
+  background: var(--color-bg-elevated);
+}
+
+.news-plan-row-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.news-plan-event {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* The release family the read was resolved through. */
+.news-plan-family {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.news-plan-figures {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.news-plan-actual {
+  color: var(--color-text);
+}
+
+.news-plan-forecast {
+  color: var(--color-text-muted);
+}
+
+.news-plan-read {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.news-plan-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.news-plan-chip.is-firm {
+  border-color: color-mix(in srgb, var(--color-green) 45%, transparent);
+  background: color-mix(in srgb, var(--color-green) 12%, transparent);
+  color: var(--color-green);
+}
+
+.news-plan-chip.is-soft {
+  border-color: color-mix(in srgb, var(--color-red) 45%, transparent);
+  background: color-mix(in srgb, var(--color-red) 12%, transparent);
+  color: var(--color-red);
+}
+
+.news-plan-chip.is-flat {
+  border-color: var(--color-border-strong);
+  background: color-mix(in srgb, var(--color-border) 40%, transparent);
+  color: var(--color-text-muted);
+}
+
+.news-plan-against {
+  font-size: 11px;
+  color: var(--color-text-dim);
+}
+
+.news-plan-why {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--color-text-dim);
+}
+
+.news-plan-market {
+  color: var(--color-text-muted);
+}
+
+.news-plan-foot {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+/* The compact read list on the month page. */
+
+.news-reads {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-panel);
+  overflow: hidden;
+}
+
+.news-reads-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) auto minmax(0, 1.6fr);
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+}
+
+.news-reads-row:last-child {
+  border-bottom: none;
+}
+
+.news-reads-why {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
 }
 
 /* ---------- Pager ---------- */
@@ -688,6 +953,18 @@
   .news-metric,
   .news-card {
     padding: 15px;
+  }
+
+  /*
+    The three-part read row needs its own column layout once there is no room
+    to sit across: event, then lean, then the why underneath.
+  */
+  .news-reads-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .news-reads-why {
+    grid-column: 1 / -1;
   }
 }
 
