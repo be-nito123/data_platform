@@ -101,7 +101,7 @@ function approx(actual: number | null | undefined, expected: number) {
   assert.equal(jan2025.monthSlug, "01");
   assert.equal(jan2025.events.length, 2);
 
-  const nfp = jan2025.events.find((event) => event.matchKey === "nfp");
+  const nfp = jan2025.events.find((event) => event.matchKey === "non farm payrolls");
   assert.ok(nfp);
   assert.equal(nfp?.actual?.amount, 197);
   assert.equal(nfp?.actual?.unit, "thousand");
@@ -121,7 +121,7 @@ function approx(actual: number | null | undefined, expected: number) {
   assert.equal(jan2026.events[1]?.mom?.amount, 0); // 213K vs 213K
 
   // Year on year: NFP 2026 actual 213K vs 2025 197K → +16K
-  const nfp2026 = jan2026.events.find((event) => event.matchKey === "nfp");
+  const nfp2026 = jan2026.events.find((event) => event.matchKey === "non farm payrolls");
   assert.ok(nfp2026?.yoy);
   assert.equal(nfp2026?.yoy?.amount, 16);
   assert.equal(nfp2026?.yoy?.unit, "thousand");
@@ -147,6 +147,12 @@ function approx(actual: number | null | undefined, expected: number) {
    ========================================================= */
 
 {
+  /*
+    A month covered by more than one tab is folded together event by event,
+    because during the migration from the auction report to the gold report both
+    workbooks carry the same months and neither is complete on its own. A
+    per-month winner would drop the rows only the losing sheet has.
+  */
   const collision = buildNewsArchive(
     [
       // A placeholder somebody created first and never filled in.
@@ -162,14 +168,22 @@ function approx(actual: number | null | undefined, expected: number) {
           ["", "NFP", "Fri 3, 6:00 pm", "180K", "175K", "160K"],
         ],
       },
-      // Two tabs that are equally full: only the explicit year can decide.
+      // Two tabs that are equally full: their rows are combined too.
       {
         tab: "MAY 2026",
-        rows: [HEADER, ["Week 1", "ISM Manufacturing", "Fri 1, 7:30 pm", "54.0", "53.5", "52.7"]],
+        rows: [
+          HEADER,
+          ["Week 1", "ISM Manufacturing PMI", "Fri 1, 7:30 pm", "54.0", "53.5", "52.7"],
+          ["", "Fed Waller Speaks", "Fri 1, 9:00 pm", "—", "", ""],
+        ],
       },
       {
-        tab: "MAY MASTER SHEET",
-        rows: [HEADER, ["Week 1", "ISM Manufacturing", "Fri 1, 7:30 pm", "53.9", "53.5", "52.7"]],
+        tab: "GOLD MAY TRACKER",
+        rows: [
+          HEADER,
+          ["Week 1", "ISM Manufacturing PMI", "2026-05-01", "54.0", "53.5", "52.7"],
+          ["", "Non-Farm Payrolls (NFP)", "2026-05-02", "180K", "175K", "160K"],
+        ],
       },
     ],
     2026
@@ -177,22 +191,435 @@ function approx(actual: number | null | undefined, expected: number) {
 
   assert.equal(collision.months.length, 2);
 
-  // The tab with something in it beats the empty one, not the other way round.
+  // The empty placeholder contributes nothing, so April is the filled tab's.
   const april = findNewsMonth(collision, 2026, 4);
-  assert.equal(april?.tab, "APRIL MASTER SHEET");
   assert.equal(april?.events.length, 2);
   assert.equal(april?.events[1]?.mom?.amount, 20); // 180K against 160K
 
-  // Equal counts are settled by the tab that spells its year out.
+  // May is the union of both tabs: the two shared releases and the one that
+  // only one sheet carried.
   const may = findNewsMonth(collision, 2026, 5);
-  assert.equal(may?.tab, "MAY 2026");
-  assert.equal(may?.events[0]?.actual?.amount, 54);
+  assert.equal(may?.events.length, 3);
+  assert.deepEqual(
+    (may?.events ?? []).map((event) => event.matchKey),
+    ["ism manufacturing", "fed waller speaks", "non farm payrolls"]
+  );
+
+  // The merged month names every tab it came from, so a half-migrated month is
+  // visible rather than silent.
+  assert.equal(may?.tab, "MAY 2026 + GOLD MAY TRACKER");
 
   const reported = collision.warnings.join(" ");
-  assert.ok(reported.includes("April 2026"), reported);
-  assert.ok(reported.includes("MAY MASTER SHEET"), reported);
-  // The losing tab's own complaints are not reported — it did not get used.
-  assert.ok(!reported.includes("no header row"), reported);
+  assert.ok(reported.includes("MAY 2026"), reported);
+  assert.ok(reported.includes("GOLD MAY TRACKER"), reported);
+  /*
+    The empty April placeholder adds nothing to the month, so it is not reported
+    as a merge — the notice is reserved for a merge that actually rescued rows,
+    which is what keeps the setup banner readable during the migration.
+  */
+  assert.ok(!reported.includes("April 2026"), reported);
+}
+
+/* =========================================================
+   MERGING: WHICH SHEET'S ROW WINS
+   ========================================================= */
+
+{
+  /*
+    Where both sheets carry the same release the better-populated row is kept.
+    The gold sheet has the forecast and the OHLCV, the auction sheet's 2026 tabs
+    have neither, so gold has to win — losing the forecast would be a regression
+    for every overlap month.
+  */
+  const merged = buildNewsArchive(
+    [
+      {
+        tab: "SEP 2026",
+        rows: [
+          HEADER,
+          ["Week 1", "NFP", "Fri 4, 6:00 pm", "162K", "", "21K"],
+        ],
+      },
+      {
+        tab: "GOLD SEPTEMBER TRACKER",
+        rows: [
+          [
+            "Week",
+            "News Event",
+            "Release Date",
+            "Release Time (IST)",
+            "Actual",
+            "Forecast",
+            "Previous",
+            "Event Day Open/Close",
+            "Event Day Volume",
+            "Event Day OI",
+          ],
+          [
+            "Week 1",
+            "Non-Farm Payrolls (NFP)",
+            "2026-09-04",
+            "6:00 PM IST",
+            "162K",
+            "55K",
+            "21K",
+            "4,552/4,476",
+            "219,572",
+            "414,355",
+          ],
+        ],
+      },
+    ],
+    2026
+  );
+
+  const september = findNewsMonth(merged, 2026, 9);
+  assert.equal(september?.events.length, 1, "the two spellings must land on one row");
+
+  const nfp = september?.events[0];
+  assert.equal(nfp?.matchKey, "non farm payrolls");
+  // The gold row won on score, so the forecast and the OHLCV are present.
+  assert.equal(nfp?.forecast?.amount, 55);
+  assert.equal(nfp?.actual?.amount, 162);
+  assert.deepEqual(nfp?.reaction?.eventDay, {
+    open: 4552,
+    close: 4476,
+    raw: "4,552/4,476",
+  });
+  assert.equal(nfp?.reaction?.eventVolume, 219572);
+  assert.equal(nfp?.reaction?.eventOi, 414355);
+}
+
+/* =========================================================
+   NAME ALIASES
+   ========================================================= */
+
+{
+  /*
+    The two workbooks spell the same releases differently — the gold sheet writes
+    them out, the auction sheet shortens them — and the merge depends on both
+    landing on one key. Each equivalence below is named in the allow-list; the
+    separations are just as important, because a merge that invents a shared key
+    for two different releases would put a confident wrong figure on the page.
+  */
+  const spellings = buildNewsArchive(
+    [
+      {
+        tab: "OCT 2026",
+        rows: [
+          HEADER,
+          ["Week 1", "CPI (YoY)", "Tue 1, 6:00 pm", "3.70%", "3.60%", "3.40%"],
+          ["", "PPI (YoY)", "Tue 1, 6:00 pm", "6.30%", "5.30%", "5.60%"],
+          ["", "Fed Interest Rate Decision", "Wed 2, 6:00 pm", "4.00%", "4.00%", "3.75%"],
+          ["", "ISM Non-Manufacturing PMI", "Thu 3, 7:30 pm", "54.9", "55.1", "55.4"],
+          ["", "Average Hourly Earnings (MoM", "Fri 4, 6:00 pm", "0.10%", "0.30%", "0.30%"],
+        ],
+      },
+      {
+        tab: "OCTOBER GOLD REPORT",
+        rows: [
+          [
+            "Week",
+            "News Event",
+            "Release Date",
+            "Release Time (IST)",
+            "Actual",
+            "Forecast",
+            "Previous",
+          ],
+          ["Week 1", "Consumer Price Index (CPI YoY)", "2026-10-01", "6:00 PM IST", "3.70%", "3.60%", "3.40%"],
+          ["", "Producer Price Index (PPI YoY)", "2026-10-01", "6:00 PM IST", "6.30%", "5.30%", "5.60%"],
+          ["", "FOMC Interest Rate Decision", "2026-10-02", "6:00 PM IST", "4.00%", "4.00%", "3.75%"],
+          ["", "ISM Services PMI", "2026-10-03", "7:30 PM IST", "54.9", "55.1", "55.4"],
+          ["", "Average Hourly Earnings (MoM)", "2026-10-04", "6:00 PM IST", "0.10%", "0.30%", "0.30%"],
+        ],
+      },
+    ],
+    2026
+  );
+
+  const october = findNewsMonth(spellings, 2026, 10);
+  assert.equal(
+    october?.events.length,
+    5,
+    "every pair of spellings must collapse to one row: " +
+      JSON.stringify((october?.events ?? []).map((event) => event.matchKey))
+  );
+
+  assert.deepEqual(
+    (october?.events ?? []).map((event) => event.matchKey),
+    [
+      "cpi yoy",
+      "ppi yoy",
+      "interest rate decision",
+      "ism services pmi",
+      "average hourly earnings",
+    ]
+  );
+}
+
+/* =========================================================
+   ALIASES THAT MUST NOT MERGE
+   ========================================================= */
+
+{
+  /*
+    The other half of the allow-list: pairs that look close but are different
+    releases. Collapsing these would report one release's number as another's,
+    which is worse than leaving the column blank — so they are pinned here.
+  */
+  const distinct = buildNewsArchive(
+    [
+      {
+        tab: "SEP 2026",
+        rows: [
+          HEADER,
+          ["Week 1", "CPI (YoY)", "Tue 1, 6:00 pm", "3.40%", "3.40%", "3.40%"],
+          ["", "Core CPI (YoY)", "Tue 1, 6:00 pm", "2.40%", "2.40%", "2.50%"],
+          ["", "PCE Price Index (YoY)", "Tue 2, 6:00 pm", "3.40%", "3.70%", "3.40%"],
+          ["", "Core PCE Price Index (YoY)", "Tue 2, 6:00 pm", "3.00%", "3.30%", "3.00%"],
+          ["", "ISM Manufacturing PMI", "Wed 3, 7:30 pm", "54.6", "55.2", "55.6"],
+          ["", "ISM Services PMI", "Wed 3, 7:30 pm", "55.4", "54.1", "54.1"],
+          ["", "NFP", "Fri 5, 6:00 pm", "162K", "55K", "21K"],
+          ["", "NFP (Aug)", "Fri 5, 6:00 pm", "162K", "55K", "21K"],
+        ],
+      },
+    ],
+    2026
+  );
+
+  const september = findNewsMonth(distinct, 2026, 9);
+  assert.equal(
+    september?.events.length,
+    8,
+    "none of these may collapse: " +
+      JSON.stringify((september?.events ?? []).map((event) => event.matchKey))
+  );
+
+  const keys = new Set((september?.events ?? []).map((event) => event.matchKey));
+  for (const key of [
+    "cpi yoy",
+    "core cpi",
+    "pce",
+    "core pce",
+    "ism manufacturing",
+    "ism services pmi",
+    "non farm payrolls",
+    "nfp aug",
+  ]) {
+    assert.ok(keys.has(key), `missing ${key}: ${[...keys].join(", ")}`);
+  }
+}
+
+/* =========================================================
+   A MONTH NAMED THE OTHER WAY ROUND
+   ========================================================= */
+
+{
+  /*
+    The gold workbook names its tabs "GOLD SEPTEMBER TRACKER" and "OCTOBER GOLD
+    REPORT" — the month is in the middle rather than at the front. The reader has
+    to accept those while still rejecting a tab that names no month at all, such
+    as the auction report or a sources tab.
+  */
+  const goldTabs = buildNewsArchive(
+    [
+      {
+        tab: "GOLD SEPTEMBER TRACKER",
+        rows: [
+          ["ELITE CAPITAL-GOLD MACRO REPORT SEPTEMBER 2026"],
+          [],
+          [
+            "Week",
+            "News Event",
+            "Release Date",
+            "Release Time (IST)",
+            "Actual",
+            "Forecast",
+            "Previous",
+          ],
+          ["Week 1", "ISM Services PMI", "2026-09-03", "7:30 PM IST", "55.4", "54.1", "54.1"],
+        ],
+      },
+      {
+        tab: "OCTOBER GOLD REPORT",
+        rows: [
+          ["ELITE CAPITAL - GOLD MACRO REPORT | OCTOBER 2026"],
+          [],
+          [
+            "Week",
+            "News Event",
+            "Release Date",
+            "Release Time (IST)",
+            "Actual",
+            "Forecast",
+            "Previous",
+          ],
+          ["Week 1", "Initial Jobless Claims", "2026-10-01", "6:00 PM IST", "197K", "201K", "198K"],
+        ],
+      },
+      {
+        // Named after nothing: still skipped, and still reported.
+        tab: "US auction report",
+        rows: [["Date", "Millions"], ["27 Aug", "420.7"]],
+      },
+    ],
+    2026
+  );
+
+  const september = findNewsMonth(goldTabs, 2026, 9);
+  assert.ok(september, "GOLD SEPTEMBER TRACKER must read as September");
+  assert.equal(september?.monthName, "September");
+  assert.equal(september?.dated, false, "the year is inferred, not written");
+  assert.equal(september?.events[0]?.matchKey, "ism services pmi");
+
+  const october = findNewsMonth(goldTabs, 2026, 10);
+  assert.ok(october, "OCTOBER GOLD REPORT must read as October");
+  assert.equal(october?.events[0]?.actual?.amount, 197);
+
+  assert.ok(
+    goldTabs.warnings.some((warning) => warning.includes("US auction report")),
+    goldTabs.warnings.join(" ")
+  );
+}
+
+/* =========================================================
+   THE GOLD OHLCV BLOCK
+   ========================================================= */
+
+{
+  /*
+    The gold sheet's OHLCV columns are named two ways across its tabs, and some
+    cells miss the thousands comma the others carry. Neither may cost a figure:
+    "4503/4,365" is as readable as "4,503/4,365".
+  */
+  const ohlcv = buildNewsArchive(
+    [
+      {
+        tab: "GOLD JUNE TRACKER",
+        rows: [
+          ["ELITE CAPITAL-GOLD MACRO REPORT JUNE 2026"],
+          [],
+          [
+            "Week",
+            "News Event",
+            "Release Date",
+            "Release Time (IST)",
+            "Actual",
+            "Forecast",
+            "Previous",
+            "Event Day Open/Close",
+            "Event Day Volume",
+            "Event Day OI",
+            "Next Trading Day Date",
+            "Next Day Open/Close",
+            "Next Day Volume",
+            "Next Day OI",
+          ],
+          [
+            "Week 1",
+            "ISM Services PMI",
+            "2026-06-03",
+            "7:30 PM IST",
+            "54.1",
+            "53.5",
+            "53.0",
+            "4503/4,365",
+            "226,973",
+            "415,196",
+            "2026-06-04",
+            "4,377/4,414",
+            "211,258",
+            "411,787",
+          ],
+        ],
+      },
+      {
+        // September names the same columns differently.
+        tab: "GOLD SEPTEMBER TRACKER",
+        rows: [
+          [""],
+          [],
+          [
+            "Week",
+            "News Event",
+            "Release Date",
+            "Release Time (IST)",
+            "Actual",
+            "Forecast",
+            "Previous",
+            "Release-Time Candle Open",
+            "Day Open/Close",
+            " Volume",
+            "  OI",
+            "Next Trading Day Date",
+            "Next Day Open/Close",
+            "Next Day Volume",
+            "Next Day OI",
+          ],
+          [
+            "Week 1",
+            "ISM Manufacturing PMI",
+            "2026-09-01",
+            "7:30 PM IST",
+            "54.6",
+            "55.2",
+            "55.6",
+            "4,414",
+            "4,498/4,396",
+            "226,973",
+            "415,196",
+            "2026-09-02",
+            "4,377/4,414",
+            "211,258",
+            "411,787",
+          ],
+        ],
+      },
+    ],
+    2026
+  );
+
+  const june = findNewsMonth(ohlcv, 2026, 6);
+  const juneIsm = june?.events[0];
+  assert.ok(juneIsm?.reaction, "the June OHLCV block must be read");
+  // The missing comma is tolerated on both halves.
+  assert.deepEqual(juneIsm?.reaction?.eventDay, {
+    open: 4503,
+    close: 4365,
+    raw: "4503/4,365",
+  });
+  assert.equal(juneIsm?.reaction?.eventVolume, 226973);
+  assert.equal(juneIsm?.reaction?.eventOi, 415196);
+  assert.equal(juneIsm?.reaction?.nextDate, "2026-06-04");
+  assert.deepEqual(juneIsm?.reaction?.nextDay, {
+    open: 4377,
+    close: 4414,
+    raw: "4,377/4,414",
+  });
+
+  const september = findNewsMonth(ohlcv, 2026, 9);
+  const septemberIsm = september?.events[0];
+  assert.ok(septemberIsm?.reaction, "the September column names must be read");
+  assert.equal(septemberIsm?.reaction?.candleOpen, 4414);
+  assert.deepEqual(septemberIsm?.reaction?.eventDay, {
+    open: 4498,
+    close: 4396,
+    raw: "4,498/4,396",
+  });
+
+  // A tab with no OHLCV columns at all carries no reaction, so the second table
+  // stays off the page rather than rendering a block of dashes.
+  const plain = buildNewsArchive(
+    [
+      {
+        tab: "NOV 2026",
+        rows: [HEADER, ["Week 1", "NFP", "Fri 6, 6:00 pm", "197K", "201K", "198K"]],
+      },
+    ],
+    2026
+  );
+  assert.equal(findNewsMonth(plain, 2026, 11)?.events[0]?.reaction, null);
 }
 
 /* =========================================================
@@ -236,7 +663,7 @@ function approx(actual: number | null | undefined, expected: number) {
   assert.equal(october?.events.length, 2);
   assert.deepEqual(
     october?.events.map((event) => event.matchKey),
-    ["ism", "nfp"]
+    ["ism", "nfp delayed"]
   );
 
   // Nothing from the balance-sheet table leaked in as an event.
@@ -338,7 +765,7 @@ function approx(actual: number | null | undefined, expected: number) {
 
   // "CPI (YoY)" has no prior actual to compare against, so it stays blank
   // rather than reporting a confident zero.
-  assert.equal(byKey.get("cpi")?.yoy, null);
+  assert.equal(byKey.get("cpi yoy")?.yoy, null);
 
   // The displayed name is untouched by the normalization.
   assert.equal(byKey.get("ism manufacturing")?.name, "ISM Manufacturing PMI");
@@ -388,7 +815,7 @@ function approx(actual: number | null | undefined, expected: number) {
   };
 
   // A payrolls beat is a hotter labour market → the dollar firms.
-  const payrolls = read("nfp");
+  const payrolls = read("non farm payrolls");
   assert.equal(payrolls.against, "above");
   assert.equal(payrolls.lean, "firmer", "a payrolls beat must firm the dollar");
 
@@ -408,7 +835,7 @@ function approx(actual: number | null | undefined, expected: number) {
   assert.equal(unemployment.family, "labour-loose");
 
   // A cooler inflation print firms risk appetite → softer dollar.
-  assert.equal(read("cpi").lean, "softer");
+  assert.equal(read("cpi yoy").lean, "softer");
 
   // An in-line print is flat, neither firmer nor softer.
   const ism = read("ism manufacturing");

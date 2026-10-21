@@ -15,6 +15,8 @@ const MIN_MONTHS = 2;
 type Row = {
   key: string;
   label: string;
+  /** The event's name as the sheet writes it, used when labels collide. */
+  full: string;
   /** Indexed by month - 1; null where the event did not appear. */
   cells: (Cell | null)[];
 };
@@ -51,6 +53,7 @@ export default function NewsHeatmap({
         row = {
           key: event.matchKey,
           label: readableEventName(event.name),
+          full: event.name,
           cells: MONTHS.map(() => null),
         };
 
@@ -69,6 +72,23 @@ export default function NewsHeatmap({
       (row) => row.cells.filter((cell) => cell !== null).length >= MIN_MONTHS
     )
     .sort((left, right) => left.label.localeCompare(right.label));
+
+  /*
+    Two rows can shorten to the same label — "NFP" and "NFP (Aug)" both read as
+    "NFP" once the bracket is dropped, and they are genuinely different series:
+    one is this month's print, the other last month's reported late. A reader
+    cannot tell them apart under one name, so where a label repeats, the rows
+    fall back to their full names ("NFP (Aug)"), which is exactly the part the
+    shortening removed.
+  */
+  const labelCounts = new Map<string, number>();
+  for (const row of filled) {
+    labelCounts.set(row.label, (labelCounts.get(row.label) ?? 0) + 1);
+  }
+
+  for (const row of filled) {
+    if ((labelCounts.get(row.label) ?? 0) > 1) row.label = row.full;
+  }
 
   if (filled.length === 0) {
     return (

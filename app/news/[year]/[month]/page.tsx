@@ -13,7 +13,7 @@ import {
 } from "@/lib/supabase/data/news";
 import NewsLocked from "@/components/news/NewsLocked";
 import { NewsWarnings } from "@/components/news/NewsNotices";
-import { NewsMonthSummary, NewsEventsTable } from "@/components/news/NewsEvents";
+import { NewsMonthSummary, NewsEventsTable, NewsReactions } from "@/components/news/NewsEvents";
 import { NewsWeekReads } from "@/components/news/NewsTradingPlan";
 import MetricTrendChart, {
   type TrendSeries,
@@ -164,7 +164,11 @@ export default async function NewsMonthPage({ params }: { params: PageParams }) 
             <div className="news-section-head">
               <h2 className="news-section-title">At a glance</h2>
               <span className="news-section-note">
-                From the {entry.tab} tab
+                From{" "}
+                {entry.tab
+                  .split(" + ")
+                  .map((tab) => `"${tab}"`)
+                  .join(" and ")}
               </span>
             </div>
 
@@ -186,6 +190,23 @@ export default async function NewsMonthPage({ params }: { params: PageParams }) 
             ) : (
               <NewsEventsTable weeks={entry.weeks} />
             )}
+          </section>
+
+          <section className="news-section">
+            <div className="news-section-head">
+              <h2 className="news-section-title">Gold reaction</h2>
+              <span className="news-section-note">
+                Gold&apos;s open/close, volume and open interest around each
+                release
+              </span>
+            </div>
+
+            <NewsReactions weeks={entry.weeks} />
+
+            <p className="news-label" style={{ marginTop: 12 }}>
+              From the gold report&apos;s OHLCV block. A dash means the sheet has
+              not filled that cell in yet — it is not a price of zero.
+            </p>
           </section>
 
           <section className="news-section">

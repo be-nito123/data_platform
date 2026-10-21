@@ -129,6 +129,60 @@ export type NewsValue = {
 /** Which side of the forecast the actual came in on. */
 export type Against = "above" | "below" | "in-line";
 
+/**
+ * An open and a close, as the gold sheet writes them: "4,498/4,396".
+ *
+ * Kept as two numbers rather than one string so the UI can lay them out and a
+ * later reader can compute the move. `open` and `close` are null when the cell
+ * was present but only half readable — the sheet has a few of those — and the
+ * row then shows whichever half did parse.
+ */
+export type NewsRange = {
+  open: number | null;
+  close: number | null;
+  /** The cell as it arrived, for tooltips and for debugging a bad row. */
+  raw: string;
+};
+
+/**
+ * The market's reaction around one release, from the gold sheet's OHLCV block.
+ *
+ * Every field is independently optional: the old sheet has none of this, the
+ * gold sheet does not fill it for every row, and a month part-way through the
+ * migration will hold a mix. A missing column therefore has to render as an
+ * empty cell rather than a zero.
+ */
+export type NewsReaction = {
+  /** The release-time candle's open, where the tab has that column. */
+  candleOpen: number | null;
+  /** The event day's open/close, as one cell. */
+  eventDay: NewsRange | null;
+  /** Contract volume on the event day. */
+  eventVolume: number | null;
+  /** Open interest at the event day's close. */
+  eventOi: number | null;
+  /** The date of the next trading day, as the sheet writes it. */
+  nextDate: string | null;
+  /** The next trading day's open/close. */
+  nextDay: NewsRange | null;
+  /** Contract volume on the next trading day. */
+  nextVolume: number | null;
+  /** Open interest at the next trading day's close. */
+  nextOi: number | null;
+};
+
+/** True when a reaction carries no data at all, so its column stays hidden. */
+export function isBlankReaction(reaction: NewsReaction | null): boolean {
+  if (!reaction) return true;
+
+  return (
+    reaction.candleOpen === null &&
+    reaction.eventDay === null &&
+    reaction.nextDay === null &&
+    reaction.nextDate === null
+  );
+}
+
 export type NewsEvent = {
   /** Unique within the month, used as a React key. */
   key: string;
@@ -141,6 +195,8 @@ export type NewsEvent = {
   timeIst: string | null;
   /** The same release in US time, where the tab has that column. */
   timeUs: string | null;
+  /** The release's date, where the tab has a column of its own for it. */
+  releaseDate: string | null;
   actual: NewsValue | null;
   forecast: NewsValue | null;
   /** The sheet's own "previous" column — the prior reading of this event. */
@@ -157,6 +213,8 @@ export type NewsEvent = {
   yield: string | null;
   nas100: string | null;
   notes: string | null;
+  /** The gold sheet's OHLCV around the release, where that tab carries it. */
+  reaction: NewsReaction | null;
 };
 
 export type NewsWeek = {
@@ -240,10 +298,17 @@ export function monthNumberOf(value: string): number | null {
 /**
  * Read a tab name as a month.
  *
- * The rule is deliberately narrow: the tab has to *start* with a month. That is
- * what separates the monthly tabs from the rest of this workbook — the auction
- * report, the rig count, the EIA report — without a hard-coded list of names to
- * ignore, which would silently swallow a new tab the day someone adds one.
+ * The primary rule is narrow: the tab has to *start* with a month. That is what
+ * separates the monthly tabs from the rest of a workbook — the auction report,
+ * the rig count, the EIA report — without a hard-coded list of names to ignore,
+ * which would silently swallow a new tab the day someone adds one.
+ *
+ * A second workbook names its tabs the other way round — "GOLD SEPTEMBER
+ * TRACKER", "OCTOBER GOLD REPORT" — with the month in the middle. So when the
+ * name does not start with a month, the month is looked for anywhere in it. The
+ * asymmetry is deliberate: "starts with a month" stays the rule that keeps
+ * "US auction report" and "sources" out, and the fallback only fires when a
+ * month word is actually present.
  */
 export function parseNewsTabName(
   title: string,
@@ -253,7 +318,17 @@ export function parseNewsTabName(
 
   if (tokens.length === 0) return null;
 
-  const month = monthNumberOf(tokens[0]);
+  const leading = monthNumberOf(tokens[0]);
+
+  const month =
+    leading ??
+    // The fallback: the first token anywhere in the name that names a month.
+    tokens.reduce<number | null>((found, token) => {
+      if (found !== null) return found;
+
+      return monthNumberOf(token);
+    }, null);
+
   if (month === null) return null;
 
   const yearToken = tokens
@@ -370,6 +445,55 @@ export function parseNewsValue(cell: unknown): NewsValue | null {
 }
 
 /* =========================================================
+   GOLD REACTION PARSING
+   ========================================================= */
+
+/**
+ * A plain count — a price, a volume, an open interest.
+ *
+ * Thousands grouping is tolerated but not required, because the gold sheet is
+ * inconsistent about it: some cells read "4,503/4,365" and others the same day
+ * "4503/4,365". Demanding the comma would drop a real figure over a formatting
+ * slip, which is the wrong trade — the number is unambiguous either way.
+ */
+function parsePlainNumber(cell: unknown): number | null {
+  if (cell === null || cell === undefined) return null;
+
+  if (typeof cell === "number") {
+    return Number.isFinite(cell) ? cell : null;
+  }
+
+  const text = String(cell).replace(/[\s,]/g, "").trim();
+  if (!text) return null;
+
+  return /^[+-]?\d+(?:\.\d+)?$/.test(text) ? Number(text) : null;
+}
+
+/**
+ * An "open/close" pair, as the gold sheet writes it: "4,498/4,396".
+ *
+ * The separators are optional and either side may be missing — the sheet has a
+ * few half-filled cells — so each half is parsed on its own and a row keeps
+ * whatever it got. A cell with no slash at all is read as an open with no close,
+ * which is how the release-time candle column is written.
+ */
+function parseRange(cell: unknown): NewsRange | null {
+  if (cell === null || cell === undefined) return null;
+
+  const raw = String(cell).trim();
+  if (!raw) return null;
+
+  const [openPart, closePart] = raw.split("/");
+
+  const open = parsePlainNumber(openPart);
+  const close = closePart === undefined ? null : parsePlainNumber(closePart);
+
+  if (open === null && close === null) return null;
+
+  return { open, close, raw };
+}
+
+/* =========================================================
    COMPARISONS
    ========================================================= */
 
@@ -437,20 +561,115 @@ function againstForecast(
  * A looser match would invent a year-on-year figure for a pair that never
  * shared a release, which is worse than leaving the column blank.
  */
+/*
+  Two spellings of one release, keyed to the single name they both mean.
+
+  This is an *allow-list* on purpose. The whole point of `normalizeEventName` is
+  to decide when two rows are the same series, and the one mistake that cannot
+  be tolerated is merging two different releases: that invents a year-on-year
+  figure for a pair that never shared a source. A fuzzy edit-distance match would
+  do exactly that the first time two unrelated names sit close together. Naming
+  each equivalence by hand keeps every merge deliberate.
+
+  The entries below are the ones the two workbooks actually need: the gold sheet
+  spells releases out ("Non-Farm Payrolls (NFP)", "Consumer Price Index (CPI
+  YoY)") where the auction sheet shortens them ("NFP", "CPI (YoY)"), and one
+  release was renamed by its publisher.
+*/
+const EVENT_ALIASES: Record<string, string> = {
+  // The publisher's own rename: ISM dropped "Non-Manufacturing" in 2020.
+  "ism services": "ism services pmi",
+  "ism non manufacturing": "ism services pmi",
+  "ism nonmanufacturing": "ism services pmi",
+
+  // The Fed's rate decision, written either by institution or by committee.
+  "fed interest rate decision": "interest rate decision",
+  "fomc interest rate decision": "interest rate decision",
+
+  // Payrolls: the acronym, the hyphenated form and the run-together form.
+  nfp: "non farm payrolls",
+  nonfarm: "non farm payrolls",
+
+  // A "MoM" tail is the same series as the bare name in this workbook.
+  "average hourly earnings mom": "average hourly earnings",
+
+  /*
+    The releases whose gold-sheet spelling carries the acronym *and* the period
+    ("Consumer Price Index (CPI YoY)") where the auction sheet writes either just
+    one of them ("CPI (YoY)") or the bare acronym. Each resolves to the key the
+    auction sheet's short form produces, so both land on one row.
+  */
+  "consumer price index": "cpi yoy",
+  "consumer price index cpi": "cpi yoy",
+  cpi: "cpi yoy",
+  "producer price index": "ppi yoy",
+  "producer price index ppi": "ppi yoy",
+  ppi: "ppi yoy",
+  "non farm payrolls nfp": "non farm payrolls",
+  "nonfarm payrolls": "non farm payrolls",
+};
+
+/**
+ * Period qualifiers that the two sheets disagree about writing.
+ *
+ * The auction sheet says "CPI (YoY)" and the gold sheet "Consumer Price Index
+ * (CPI YoY)" — same number, same release. The qualifier is dropped so both read
+ * as "cpi", and `EVENT_ALIASES` then maps that to the shared key. Dropping it is
+ * safe here only because every qualifier in this workbook is a *period* — MoM,
+ * YoY, QoQ — and never the thing that distinguishes one release from another.
+ */
+const PERIOD_QUALIFIERS = new Set([
+  "yoy",
+  "mom",
+  "qoq",
+  "yy",
+  "mm",
+  "year on year",
+  "month on month",
+]);
+
+/**
+ * Is this token a period qualifier? "yoy" and "y/y" both read the same once the
+ * punctuation is stripped, which is why the set holds the collapsed form.
+ */
+function isPeriodQualifier(token: string): boolean {
+  return PERIOD_QUALIFIERS.has(token);
+}
+
 export function normalizeEventName(name: string): string {
-  const collapsed = name
+  /*
+    Bracketed text is taken out and kept, because the brackets usually hold the
+    release's *canonical* name: "Consumer Price Index (CPI YoY)" is, to every
+    calendar and every matching rule, "CPI". Dropping the bracket outright would
+    leave "consumer price index" → "consumer", which is both wrong and dangerous
+    — it would collide with a genuine Consumer Sentiment row. The bracket's words
+    are kept and the surrounding words follow them, so both spellings of one
+    release collapse to the same string.
+  */
+  const bracketed = [...name.matchAll(/\(([^)]*)\)/g)]
+    .map((match) => match[1])
+    .join(" ");
+
+  const collapsed = `${name.replace(/\([^)]*\)/g, " ")} ${bracketed}`
     .replace(/[^\x20-\x7E]/g, " ") // emoji and other non-ASCII decoration
     .toLowerCase()
-    .replace(/\([^)]*\)/g, " ")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
-  return collapsed
+  const withoutQualifiers = collapsed
+    .split(" ")
+    .filter((token) => !isPeriodQualifier(token))
+    .join(" ")
+    .trim();
+
+  const trimmed = withoutQualifiers
     .replace(/\s+price index$/, "")
     .replace(/\s+index$/, "")
     .replace(/\s+pmi$/, "")
     .trim();
+
+  return EVENT_ALIASES[trimmed] ?? trimmed;
 }
 
 function slugify(value: string): string {
@@ -475,6 +694,7 @@ type EventField =
   | "event"
   | "timeIst"
   | "timeUs"
+  | "releaseDate"
   | "actual"
   | "forecast"
   | "previous"
@@ -482,11 +702,40 @@ type EventField =
   | "bond"
   | "yield"
   | "nas100"
-  | "notes";
+  | "notes"
+  | "candleOpen"
+  | "eventDayRange"
+  | "eventVolume"
+  | "eventOi"
+  | "nextDate"
+  | "nextDayRange"
+  | "nextVolume"
+  | "nextOi";
 
-/** Headings are compared with all whitespace removed, so "US time" ≡ "us time". */
+/*
+  Headings are compared with all whitespace removed, so "US time" ≡ "us time".
+
+  The gold sheet names its columns differently again — "News Event" for the
+  event, "Release Time (IST)" and "Release Time (US ET)" for the times — so those
+  join the lists alongside the auction sheet's "Event type" and
+  "date , time (ist)". Both spellings flow into the same field, which is what
+  lets one parser read either workbook.
+
+  The gold sheet also names its OHLCV columns two ways: October and June say
+  "Event Day Open/Close" / "Event Day Volume" / "Event Day OI", while September
+  says "Day Open/Close" / " Volume" / "  OI". Both variants are listed, and the
+  whitespace stripping means the stray leading spaces cost nothing.
+*/
 const FIELD_HEADINGS: Record<EventField, string[]> = {
-  event: ["event", "eventtype", "eventname", "events", "indicator", "release"],
+  event: [
+    "event",
+    "eventtype",
+    "eventname",
+    "events",
+    "indicator",
+    "release",
+    "newsevent",
+  ],
   timeIst: [
     "date,time(ist)",
     "date,time",
@@ -496,8 +745,19 @@ const FIELD_HEADINGS: Record<EventField, string[]> = {
     "ist",
     "time(ist)",
     "isttime",
+    "releasetime(ist)",
+    "releasetime",
   ],
-  timeUs: ["ustime", "time(us)", "time(est)", "esttime"],
+  releaseDate: ["releasedate"],
+  timeUs: [
+    "ustime",
+    "time(us)",
+    "time(est)",
+    "esttime",
+    "releasetime(uset)",
+    "releasetime(us)",
+    "uset",
+  ],
   actual: ["actual", "act", "actualvalue", "result", "results"],
   forecast: ["forcast", "forecast", "consensus", "expected", "estimate", "projection"],
   previous: ["previous", "prev", "prior", "previousvalue", "last"],
@@ -506,6 +766,14 @@ const FIELD_HEADINGS: Record<EventField, string[]> = {
   yield: ["yeild", "yield"],
   nas100: ["nas100", "nasdaq"],
   notes: ["notes", "note", "comments", "comment", "commentary", "remarks"],
+  candleOpen: ["release-timecandleopen", "releasetimecandleopen", "candleopen"],
+  eventDayRange: ["eventdayopen/close", "dayopen/close", "eventdayopenclose"],
+  eventVolume: ["eventdayvolume", "volume"],
+  eventOi: ["eventdayoi", "oi", "openinterest"],
+  nextDate: ["nexttradingdaydate", "nexttradingdate", "nextdaydate"],
+  nextDayRange: ["nextdayopen/close", "nexttradingdayopen/close", "nextdayopenclose"],
+  nextVolume: ["nextdayvolume", "nexttradingdayvolume"],
+  nextOi: ["nextdayoi", "nexttradingdayoi"],
 };
 
 const EVENT_HEADINGS = new Set(FIELD_HEADINGS.event);
@@ -729,6 +997,36 @@ function parseEventTab(grid: { tab: string; rows: unknown[][] }): {
     const timeIst = readText(row, columns.timeIst);
     const timeUs = readText(row, columns.timeUs);
 
+    /*
+      The gold reaction is built from whichever of its columns this tab has. The
+      old sheet has none of them, so every field stays null and the block is
+      dropped — `isBlankReaction` then keeps the second table off the page.
+    */
+    const reaction: NewsReaction = {
+      candleOpen: parsePlainNumber(
+        columns.candleOpen === undefined ? null : row[columns.candleOpen]
+      ),
+      eventDay: parseRange(
+        columns.eventDayRange === undefined ? null : row[columns.eventDayRange]
+      ),
+      eventVolume: parsePlainNumber(
+        columns.eventVolume === undefined ? null : row[columns.eventVolume]
+      ),
+      eventOi: parsePlainNumber(
+        columns.eventOi === undefined ? null : row[columns.eventOi]
+      ),
+      nextDate: readText(row, columns.nextDate),
+      nextDay: parseRange(
+        columns.nextDayRange === undefined ? null : row[columns.nextDayRange]
+      ),
+      nextVolume: parsePlainNumber(
+        columns.nextVolume === undefined ? null : row[columns.nextVolume]
+      ),
+      nextOi: parsePlainNumber(
+        columns.nextOi === undefined ? null : row[columns.nextOi]
+      ),
+    };
+
     // A row has to say something beyond the event's name to be an event.
     if (!actual && !forecast && !previous && !timeIst && !timeUs) continue;
 
@@ -751,6 +1049,7 @@ function parseEventTab(grid: { tab: string; rows: unknown[][] }): {
       week,
       timeIst,
       timeUs,
+      releaseDate: readText(row, columns.releaseDate),
       actual,
       forecast,
       previous,
@@ -763,6 +1062,7 @@ function parseEventTab(grid: { tab: string; rows: unknown[][] }): {
       yield: readText(row, columns.yield),
       nas100: readText(row, columns.nas100),
       notes: readText(row, columns.notes),
+      reaction: isBlankReaction(reaction) ? null : reaction,
     });
   }
 
@@ -821,7 +1121,99 @@ type Candidate = {
   events: NewsEvent[];
   /** Problems this tab produced on its own, reported only if it wins. */
   notes: string[];
+  /**
+   * True when the tab held anything at all.
+   *
+   * This separates an empty placeholder — a tab somebody created ahead of the
+   * month, which is not a mistake — from a tab that has content but could not be
+   * read, which always is. Both produce no events, so the events alone cannot
+   * tell them apart.
+   */
+  hasContent: boolean;
 };
+
+/**
+ * How well populated one row is, used to decide which sheet's version of a
+ * shared release to keep.
+ *
+ * The gold row wins on a tie because it carries the forecast and the OHLCV that
+ * the auction sheet's 2026 tabs lack. Scoring rather than a fixed "gold always
+ * wins" keeps that honest: if a future tab is richer still, it takes the row.
+ */
+function reactionScore(event: NewsEvent): number {
+  let score = 0;
+
+  if (event.actual) score += 1;
+  if (event.forecast) score += 1;
+  if (event.previous) score += 1;
+  if (event.reaction) score += 1;
+  if (event.timeUs) score += 1;
+
+  return score;
+}
+
+/**
+ * Fold the tabs covering one month into a single month, event by event.
+ *
+ * The first tab sets the month's identity — its year, its dated flag and its
+ * name — and every tab's rows are then keyed by `matchKey`, so two spellings of
+ * one release ("NFP" and "Non-Farm Payrolls (NFP)") land on one row. Where both
+ * tabs carry the same release the better-populated row wins; a row only one tab
+ * has is kept as it stands.
+ *
+ * `key` is re-slugged at the end because two tabs can each hold a row whose key
+ * was unique within its own tab ("ism-manufacturing-pmi") and the merged list
+ * needs one key per row.
+ */
+function mergeCandidates(group: Candidate[]): Candidate {
+  const first = group[0];
+
+  const order: string[] = [];
+  const byKey = new Map<string, NewsEvent>();
+
+  for (const candidate of group) {
+    for (const event of candidate.events) {
+      const existing = byKey.get(event.matchKey);
+
+      if (!existing) {
+        byKey.set(event.matchKey, event);
+        order.push(event.matchKey);
+        continue;
+      }
+
+      if (reactionScore(event) > reactionScore(existing)) {
+        byKey.set(event.matchKey, event);
+      }
+    }
+  }
+
+  const usedKeys = new Set<string>();
+  const events = order.map((matchKey) => {
+    const event = byKey.get(matchKey) as NewsEvent;
+
+    let key = slugify(event.matchKey) || "event";
+    let attempt = 2;
+
+    while (usedKeys.has(key)) {
+      key = `${slugify(event.matchKey) || "event"}-${attempt}`;
+      attempt += 1;
+    }
+
+    usedKeys.add(key);
+
+    return { ...event, key };
+  });
+
+  return {
+    month: first.month,
+    year: first.year,
+    dated: group.some((candidate) => candidate.dated),
+    tab: group.map((candidate) => candidate.tab).join(" + "),
+    events,
+    notes: [],
+    hasContent: group.some((candidate) => candidate.hasContent),
+  };
+}
 
 /**
  * Assemble the room from the grids that were read.
@@ -855,7 +1247,18 @@ export function buildNewsArchive(
     }
 
     const { events, warnings: notes } = parseEventTab(grid);
-    const candidate: Candidate = { ...parsed, tab: grid.tab, events, notes };
+
+    const hasContent = grid.rows.some((row) =>
+      (row ?? []).some((cell) => !isBlank(cell))
+    );
+
+    const candidate: Candidate = {
+      ...parsed,
+      tab: grid.tab,
+      events,
+      notes,
+      hasContent,
+    };
 
     const slot = `${candidate.year}-${String(candidate.month).padStart(2, "0")}`;
     const group = bySlot.get(slot);
@@ -865,44 +1268,73 @@ export function buildNewsArchive(
   }
 
   /*
-    Two tabs can name the same month — "APRIL MASTER SHEET" and "April 2026"
-    both do. Preferring the one that spells its year out would be the obvious
-    rule, except that a dated tab is often the placeholder somebody created
-    first and never filled in. The tab with the most events wins instead, and
-    an explicit year only settles a tie between equals.
+    A month can be covered by more than one tab, and during the migration from
+    the auction report to the gold report it *is*: May, June, September and
+    October 2026 all exist in both workbooks at once.
+
+    Picking one tab and discarding the other would be wrong in both directions.
+    Neither sheet is complete on its own — the gold sheet carries forecast and
+    OHLCV for the overlap months while the auction sheet carries rows gold lacks
+    ("Fed Waller Speaks", "Federal Budget Balance", "NFP (Aug)") and is the only
+    source for 2025 and for the 2026 months gold has not filled in. So the two
+    are folded together per *event*, not per month:
+
+      - a release both sheets name is one row, with the gold reading preferred
+        (it has the forecast and the OHLCV; the auction sheet's 2026 tabs have
+        blank forecasts)
+      - a release only one sheet names is kept as it stands
+      - the week heading and the row order follow the first tab that carried the
+        month, so the calendar keeps its shape
+
+    When every month has moved across and the auction sheet contributes nothing,
+    this reduces to reading the gold sheet alone — no second code change.
   */
 
   const candidates: Candidate[] = [];
 
   for (const group of bySlot.values()) {
-    const winner = group.reduce((best, other) => {
-      if (other.events.length > best.events.length) return other;
-      if (
-        other.events.length === best.events.length &&
-        other.dated &&
-        !best.dated
-      ) {
-        return other;
-      }
+    const merged = group.length > 1 ? mergeCandidates(group) : group[0];
 
-      return best;
-    }, group[0]);
+    /*
+      A merge is only worth reporting when it actually rescued rows — when more
+      than one tab put events into the month. During the migration every overlap
+      month has a second tab, and reporting each one would fill the setup banner
+      with notices that are the expected state, not a problem. A tab that turned
+      out to be an empty placeholder adds nothing, so it stays quiet; the month
+      page's "From … and …" line already names every contributing tab.
+    */
+    const contributors = group.filter((candidate) => candidate.events.length > 0);
 
-    for (const candidate of group) {
-      if (candidate === winner) continue;
-
+    if (group.length > 1 && contributors.length > 1) {
       warn(
-        candidate.events.length === 0
-          ? `${candidate.tab}: contains no events, so this month came from ` +
-              `"${winner.tab}" instead.`
-          : `${candidate.tab}: skipped, because "${winner.tab}" already covers ` +
-              `${monthNameOf(winner.month)} ${winner.year}.`
+        `${monthNameOf(merged.month)} ${merged.year} is covered by ` +
+          `${contributors.length} tabs (${contributors
+            .map((item) => `"${item.tab}"`)
+            .join(", ")}), so their events were combined into one month.`
       );
     }
 
-    for (const note of winner.notes) warn(note);
+    for (const candidate of group) {
+      /*
+        A candidate that was folded in still had problems worth reporting — a
+        column it could not read, a second table it stopped at. What is dropped
+        is the silence of an empty placeholder: a tab with nothing in it has no
+        complaint to make, and during the migration the gold sheet has several
+        months created ahead of time.
+      */
+      if (!candidate.hasContent) continue;
 
-    candidates.push(winner);
+      for (const note of candidate.notes) warn(note);
+    }
+
+    if (merged.events.length === 0 && merged.notes.length === 0) {
+      warn(
+        `${merged.tab}: ${monthNameOf(merged.month)} ${merged.year} ` +
+          `has no events yet, so it shows as an empty month.`
+      );
+    }
+
+    candidates.push(merged);
   }
 
   candidates.sort(
@@ -913,13 +1345,6 @@ export function buildNewsArchive(
 
   const months: NewsMonth[] = candidates.map((candidate) => {
     const events = candidate.events;
-
-    if (events.length === 0 && candidate.notes.length === 0) {
-      warn(
-        `${candidate.tab}: ${monthNameOf(candidate.month)} ${candidate.year} ` +
-          `has no events yet, so it shows as an empty month.`
-      );
-    }
 
     return {
       year: candidate.year,

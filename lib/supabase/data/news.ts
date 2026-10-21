@@ -31,15 +31,39 @@ import {
 
 export * from "./news-sheet";
 
-/** Rows and columns read from each tab. The monthly sheets are ~30 rows. */
-const NEWS_READ_RANGE = "A1:N300";
+/**
+ * Rows and columns read from each tab.
+ *
+ * The monthly sheets are ~30 rows. The width is set by the gold report, which
+ * carries the event calendar and then a full OHLCV block beside it — sixteen
+ * columns as far as "Next Day OI". Reading only the event calendar's width would
+ * silently drop the last two gold columns, which is exactly the sort of loss the
+ * column-name matching exists to prevent.
+ */
+const NEWS_READ_RANGE = "A1:P300";
 
 /**
- * Where the monthly tabs live. They are expected in their own spreadsheet;
- * falling back to the primary one keeps a single-workbook setup working.
+ * The spreadsheets the monthly tabs live in.
+ *
+ * More than one is normal during the migration from the auction report to the
+ * gold report: both workbooks carry a month at the same time, and `buildNewsArchive`
+ * folds them together. `NEWS_GOOGLE_SHEET_ID` is therefore a comma-separated
+ * list, oldest first, and the fallback to `GOOGLE_SHEET_ID` keeps a
+ * single-workbook setup working.
+ *
+ * The list is the right shape for the end of the migration too. Retiring a sheet
+ * is then a matter of dropping an id from the environment rather than a code
+ * change, and leaving one in place costs a single listing call.
  */
-function newsSpreadsheetId(): string | undefined {
-  return process.env.NEWS_GOOGLE_SHEET_ID || process.env.GOOGLE_SHEET_ID;
+function newsSpreadsheetIds(): string[] {
+  const configured = process.env.NEWS_GOOGLE_SHEET_ID || process.env.GOOGLE_SHEET_ID;
+
+  if (!configured) return [];
+
+  return configured
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
 }
 
 /** The year a "MASTER SHEET" tab belongs to, when the name does not say. */
@@ -48,71 +72,87 @@ function currentYear(): number {
 }
 
 export async function getNewsArchive(): Promise<NewsArchive> {
-  const spreadsheetId = newsSpreadsheetId();
+  const spreadsheetIds = newsSpreadsheetIds();
   const fallbackYear = currentYear();
 
-  if (!spreadsheetId) {
+  if (spreadsheetIds.length === 0) {
     return buildNewsArchive([], fallbackYear, [
       "No spreadsheet configured. Set NEWS_GOOGLE_SHEET_ID in .env.local.",
     ]);
   }
 
-  let titles: string[];
-
-  try {
-    titles = await listSheetTitles(spreadsheetId);
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-
-    return buildNewsArchive([], fallbackYear, [
-      `The news spreadsheet could not be opened: ${reason}`,
-    ]);
-  }
-
-  const monthlyTabs = titles.filter(
-    (title) => parseNewsTabName(title, fallbackYear) !== null
-  );
-
-  if (monthlyTabs.length === 0) {
-    const [specific, openEnded] = NEWS_TAB_EXAMPLES;
-
-    return buildNewsArchive([], fallbackYear, [
-      "No tab in the spreadsheet is named after a month. Expected something " +
-        `like "${specific}" or "${openEnded}". Found: ${
-          titles.join(", ") || "(no tabs)"
-        }.`,
-    ]);
-  }
-
-  const results = await Promise.all(
-    monthlyTabs.map(async (tab): Promise<NewsTabGrid | string> => {
-      try {
-        const rows = await getSheetData(
-          tab,
-          NEWS_READ_RANGE,
-          spreadsheetId,
-          "FORMATTED_VALUE"
-        );
-
-        return { tab, rows };
-      } catch (error) {
-        const reason = error instanceof Error ? error.message : String(error);
-
-        return `Tab "${tab}": ${reason}`;
-      }
-    })
-  );
-
   const grids: NewsTabGrid[] = [];
   const warnings: string[] = [];
+  let recognisedAnything = false;
 
-  for (const result of results) {
-    if (typeof result === "string") {
-      if (!warnings.includes(result)) warnings.push(result);
+  for (const spreadsheetId of spreadsheetIds) {
+    let titles: string[];
+
+    try {
+      titles = await listSheetTitles(spreadsheetId);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+
+      /*
+        One workbook failing to open must not take the other down with it. At the
+        end of the migration the auction sheet is likely to be archived or
+        unshared, and the page has to keep working on the gold sheet alone.
+      */
+      warnings.push(
+        `The news spreadsheet ${spreadsheetId} could not be opened: ${reason}`
+      );
       continue;
     }
 
-    grids.push(result);
+    const monthlyTabs = titles.filter(
+      (title) => parseNewsTabName(title, fallbackYear) !== null
+    );
+
+    if (monthlyTabs.length === 0) {
+      const [specific, openEnded] = NEWS_TAB_EXAMPLES;
+
+      warnings.push(
+        `No tab in the spreadsheet ${spreadsheetId} is named after a month. ` +
+          `Expected something like "${specific}" or "${openEnded}". Found: ${
+            titles.join(", ") || "(no tabs)"
+          }.`
+      );
+      continue;
+    }
+
+    recognisedAnything = true;
+
+    const results = await Promise.all(
+      monthlyTabs.map(async (tab): Promise<NewsTabGrid | string> => {
+        try {
+          const rows = await getSheetData(
+            tab,
+            NEWS_READ_RANGE,
+            spreadsheetId,
+            "FORMATTED_VALUE"
+          );
+
+          return { tab, rows };
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+
+          return `Tab "${tab}": ${reason}`;
+        }
+      })
+    );
+
+    for (const result of results) {
+      if (typeof result === "string") {
+        if (!warnings.includes(result)) warnings.push(result);
+        continue;
+      }
+
+      grids.push(result);
+    }
+  }
+
+  if (!recognisedAnything && grids.length === 0) {
+    return buildNewsArchive([], fallbackYear, warnings);
   }
 
   return buildNewsArchive(grids, fallbackYear, warnings);

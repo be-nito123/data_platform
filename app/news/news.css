@@ -315,6 +315,27 @@
   background: var(--color-bg-elevated);
 }
 
+/*
+  The gold reaction table. It carries nine columns rather than eight, and the
+  widest of them is a pair ("4,498 / 4,396"), so the base min-width would force
+  the numbers to wrap. The name column keeps less room here for the same reason:
+  the point of the table is the figures beside it.
+*/
+
+.news-table-gold {
+  min-width: 760px;
+}
+
+.news-table-gold thead th:first-child,
+.news-table-gold tbody td:first-child {
+  width: 26%;
+}
+
+.news-table-gold thead th:not(:first-child),
+.news-table-gold tbody td:not(:first-child) {
+  width: 9.25%;
+}
+
 /* The release's name, then anything the sheet said about it underneath. */
 
 .news-event-name {

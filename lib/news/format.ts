@@ -7,7 +7,7 @@
    whether a number wears a percent sign.
    ========================================================= */
 
-import type { NewsValue, ValueUnit } from "@/lib/supabase/data/news";
+import type { NewsRange, NewsValue, ValueUnit } from "@/lib/supabase/data/news";
 
 /** The unit as it is written back out: "197K", "4.20%" — but not "197". */
 const UNIT_SUFFIX: Record<ValueUnit, string> = {
@@ -73,6 +73,45 @@ export function formatNewsDelta(value: NewsValue | null): string {
 /** "12" — a count, not a measured figure. */
 export function formatNewsCount(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
+}
+
+/* =========================================================
+   GOLD REACTION
+   ========================================================= */
+
+/** "4,498" — a gold price, to the precision the sheet wrote it in. */
+export function formatPrice(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "—";
+
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+/**
+ * An open/close pair as one cell: "4,498 / 4,396".
+ *
+ * Either half can be missing — the sheet has a few cells that only hold an open
+ * — so an absent side becomes a dash rather than collapsing the whole cell.
+ */
+export function formatRange(range: NewsRange | null): string {
+  if (!range) return "—";
+
+  return `${formatPrice(range.open)} / ${formatPrice(range.close)}`;
+}
+
+/**
+ * A contract count: volume and open interest.
+ *
+ * These run to six figures ("415,196"), and the sheet writes them inconsistently
+ * — some with thousands separators, some without. They are reformatted here so
+ * the column reads the same all the way down.
+ */
+export function formatContracts(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "—";
+
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
 }
 
 /* =========================================================

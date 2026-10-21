@@ -1,8 +1,15 @@
-import type { NewsEvent, NewsMonth, NewsWeek } from "@/lib/supabase/data/news";
+import type {
+  NewsEvent,
+  NewsMonth,
+  NewsWeek,
+} from "@/lib/supabase/data/news";
 import {
   changeClass,
+  formatContracts,
   formatNewsDelta,
   formatNewsValue,
+  formatPrice,
+  formatRange,
 } from "@/lib/news/format";
 
 /** Event, time, actual, forecast, previous, surprise, MoM, YoY. */
@@ -153,6 +160,132 @@ function EventRow({ event }: { event: NewsEvent }) {
 
       <td className={changeCellClass(event.yoy)}>
         {formatNewsDelta(event.yoy)}
+      </td>
+    </tr>
+  );
+}
+
+/* =========================================================
+   GOLD REACTION
+   ========================================================= */
+
+/**
+ * What gold did around each release, from the gold report's OHLCV block.
+ *
+ * This lives in its own table rather than beside the figures above because it is
+ * a different subject: the events table is "what the economy did", this is "what
+ * the market did about it". Side by side, the nine extra columns would squeeze
+ * the events table to the point of being unreadable on a laptop, and the two
+ * would look like one wide row of unrelated numbers.
+ *
+ * The rows line up with the events table by event order, not by an explicit tie,
+ * because both are built from the same `weeks` and so cannot drift apart.
+ *
+ * Every figure is optional. The table is only shown at all when at least one
+ * event in the month carries a reaction, and a single missing cell prints a dash
+ * rather than a zero — a release the gold sheet has not filled in yet must not
+ * look like gold opened at nothing.
+ */
+export function NewsReactions({ weeks }: { weeks: NewsWeek[] }) {
+  const weeksWithReactions = weeks
+    .map((week) => ({
+      label: week.label,
+      events: week.events.filter((event) => event.reaction),
+    }))
+    .filter((week) => week.events.length > 0);
+
+  if (weeksWithReactions.length === 0) return null;
+
+  return (
+    <div className="news-table-wrap">
+      <table className="news-table news-table-gold">
+        <thead>
+          <tr>
+            <th scope="col">Event</th>
+            <th scope="col">Candle open</th>
+            <th scope="col">Event day O/C</th>
+            <th scope="col">Event volume</th>
+            <th scope="col">Event OI</th>
+            <th scope="col">Next day</th>
+            <th scope="col">Next day O/C</th>
+            <th scope="col">Next volume</th>
+            <th scope="col">Next OI</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {weeksWithReactions.map((week, index) => (
+            <ReactionWeek key={`${week.label}-${index}`} week={week} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ReactionWeek({
+  week,
+}: {
+  week: { label: string; events: NewsEvent[] };
+}) {
+  return (
+    <>
+      <tr className="news-table-week">
+        <th scope="row" colSpan={GOLD_COLUMNS}>
+          {week.label}
+        </th>
+      </tr>
+
+      {week.events.map((event) => (
+        <ReactionRow key={event.key} event={event} />
+      ))}
+    </>
+  );
+}
+
+/** Event, candle open, event day O/C, volume, OI, next day, O/C, volume, OI. */
+const GOLD_COLUMNS = 9;
+
+function ReactionRow({ event }: { event: NewsEvent }) {
+  const gold = event.reaction;
+  if (!gold) return null;
+
+  return (
+    <tr>
+      <td>
+        <span className="news-event-name">{event.name}</span>
+      </td>
+
+      <td className={gold.candleOpen === null ? "is-empty" : ""}>
+        {formatPrice(gold.candleOpen)}
+      </td>
+
+      <td className={gold.eventDay ? "" : "is-empty"}>
+        {formatRange(gold.eventDay)}
+      </td>
+
+      <td className={gold.eventVolume === null ? "is-empty" : ""}>
+        {formatContracts(gold.eventVolume)}
+      </td>
+
+      <td className={gold.eventOi === null ? "is-empty" : ""}>
+        {formatContracts(gold.eventOi)}
+      </td>
+
+      <td className={gold.nextDate ? "" : "is-empty"}>
+        {gold.nextDate ?? "—"}
+      </td>
+
+      <td className={gold.nextDay ? "" : "is-empty"}>
+        {formatRange(gold.nextDay)}
+      </td>
+
+      <td className={gold.nextVolume === null ? "is-empty" : ""}>
+        {formatContracts(gold.nextVolume)}
+      </td>
+
+      <td className={gold.nextOi === null ? "is-empty" : ""}>
+        {formatContracts(gold.nextOi)}
       </td>
     </tr>
   );
