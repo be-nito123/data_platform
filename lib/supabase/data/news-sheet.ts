@@ -424,17 +424,32 @@ function againstForecast(
  * Emoji and decorations go with them, because the flags that mark how hot a
  * release is are not part of its name.
  *
- * The limit is worth stating: "Core PCE Price Index(YoY)" and "Core PCE(YoY)"
- * do not collapse to the same string, so those two will not match across
- * years. Year-on-year coverage is reported on the page rather than assumed.
+ * Two tails are dropped as well, because the tabs disagree about how much of a
+ * release's title they bother writing:
+ *
+ *   "ISM Manufacturing PMI"        ≡  "ISM Manufacturing"
+ *   "Core PCE Price Index (YoY)"   ≡  "Core PCE (YoY)"
+ *
+ * The tails are ordered so the longer one is stripped first: "price index" is
+ * tried before "index", and "pmi" last. Two different releases can still share
+ * the string this produces — "non ISM manufacturing" is not the same series as
+ * "ISM Non-Manufacturing PMI" in this workbook — and that limit is deliberate.
+ * A looser match would invent a year-on-year figure for a pair that never
+ * shared a release, which is worse than leaving the column blank.
  */
 export function normalizeEventName(name: string): string {
-  return name
+  const collapsed = name
     .replace(/[^\x20-\x7E]/g, " ") // emoji and other non-ASCII decoration
     .toLowerCase()
     .replace(/\([^)]*\)/g, " ")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
+    .trim();
+
+  return collapsed
+    .replace(/\s+price index$/, "")
+    .replace(/\s+index$/, "")
+    .replace(/\s+pmi$/, "")
     .trim();
 }
 
@@ -521,6 +536,50 @@ function matchFieldHeading(compactHeading: string): EventField | null {
   return null;
 }
 
+/*
+  A tab can hold more than one table. The 2025 tabs carry the event calendar
+  first and a "Section 2: Fed Liquidity Tracker" underneath it — a balance-sheet
+  series with its own header row (`date | Fed's Balance sheet | previous | …`)
+  and its own rows. Left alone, those rows read as events: the event column
+  holds a date like "October3" and the "previous" column holds a figure, which
+  is exactly the shape of a release whose actual has not printed yet.
+
+  The second table is recognised by its header rather than by its title, because
+  the title lives in a merged cell that Google returns as a single unlabelled
+  string and cannot be relied on. A row is another table's header when its first
+  cell is itself a column heading and the row names at least one more — which no
+  data row does, since a data row starts with the event's name and a week label.
+*/
+const SECTION_HEADING_CELLS = 2;
+
+function headingsInRow(row: unknown[]): number {
+  return (row ?? []).filter((cell) => {
+    const heading = compact(cell);
+    if (!heading) return false;
+
+    return isWeekHeading(heading) || matchFieldHeading(heading) !== null;
+  }).length;
+}
+
+function isSecondTableHeader(row: unknown[]): boolean {
+  const first = compact((row ?? [])[0]);
+  if (!first) return false;
+
+  const leadsWithHeading =
+    isWeekHeading(first) || matchFieldHeading(first) !== null;
+
+  return leadsWithHeading && headingsInRow(row) >= SECTION_HEADING_CELLS;
+}
+
+/** Where the event table ends: the row before another table's header, or all of it. */
+function eventTableEnd(rows: unknown[][], headerIndex: number): number {
+  for (let index = headerIndex + 1; index < rows.length; index += 1) {
+    if (isSecondTableHeader(rows[index] ?? [])) return index;
+  }
+
+  return rows.length;
+}
+
 /* =========================================================
    MONTH PARSING
    ========================================================= */
@@ -603,10 +662,23 @@ function parseEventTab(grid: { tab: string; rows: unknown[][] }): {
   const headerIndex = findHeaderRow(rows);
 
   if (headerIndex === -1) {
-    warn(
-      `${tab}: no header row found — it needs a column named "Event type" ` +
-        `in the first ${HEADER_PROBE_ROWS} rows.`
+    /*
+      An empty tab is a month somebody has created but not filled in yet, and
+      there is nothing wrong with that — it is how the next month starts. Only a
+      tab that actually holds content and still has no header is a mistake worth
+      reporting.
+    */
+    const hasContent = rows.some((row) =>
+      (row ?? []).some((cell) => !isBlank(cell))
     );
+
+    if (hasContent) {
+      warn(
+        `${tab}: no header row found — it needs a column named "Event type" ` +
+          `in the first ${HEADER_PROBE_ROWS} rows.`
+      );
+    }
+
     return { events: [], warnings };
   }
 
@@ -619,11 +691,20 @@ function parseEventTab(grid: { tab: string; rows: unknown[][] }): {
     );
   }
 
+  const tableEnd = eventTableEnd(rows, headerIndex);
+
+  if (tableEnd < rows.length) {
+    warn(
+      `${tab}: stopped at a second table below the events (row ${tableEnd + 1}), ` +
+        `so only the event calendar above it was read.`
+    );
+  }
+
   const events: NewsEvent[] = [];
   const usedKeys = new Set<string>();
   let week: string | null = null;
 
-  for (const row of rows.slice(headerIndex + 1)) {
+  for (const row of rows.slice(headerIndex + 1, tableEnd)) {
     if (!row) continue;
 
     const nextWeek = readText(row, columns.week);
@@ -835,8 +916,8 @@ export function buildNewsArchive(
 
     if (events.length === 0 && candidate.notes.length === 0) {
       warn(
-        `${candidate.tab}: read as ${monthNameOf(candidate.month)} ` +
-          `${candidate.year} but no events were found in it.`
+        `${candidate.tab}: ${monthNameOf(candidate.month)} ${candidate.year} ` +
+          `has no events yet, so it shows as an empty month.`
       );
     }
 
