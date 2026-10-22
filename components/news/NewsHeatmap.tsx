@@ -132,6 +132,7 @@ export default function NewsHeatmap({
                     same page at one month. */}
                 <Link
                   href={`/news/releases/${newsReleaseSlug(row.key, row.full)}`}
+                  title={row.full}
                 >
                   {row.label}
                 </Link>
@@ -145,13 +146,21 @@ export default function NewsHeatmap({
                   return <td key={month} className="is-empty" />;
                 }
 
+                /*
+                  The hue sits on the cell, not on the link inside it: a cell
+                  can grow past its 40px link (one long label on a row is
+                  enough), and a background on the link alone would then float
+                  as a band with gaps above and below — colour that never
+                  touches its own cell's edges. On the <td> it fills the box.
+                */
                 return (
-                  <td key={month}>
+                  <td
+                    key={month}
+                    className={classOf(cell.delta?.amount ?? null) || undefined}
+                  >
                     <Link
                       href={cell.href}
-                      className={`news-heatmap-cell ${classOf(
-                        cell.delta?.amount ?? null
-                      )}`.trim()}
+                      className="news-heatmap-cell"
                       title={`${row.label} · ${entry.monthName} ${year} · ${
                         cell.delta
                           ? `${formatNewsDelta(cell.delta)} on the prior reading`

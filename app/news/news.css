@@ -486,7 +486,7 @@ a.news-event-name:hover {
 
 .news-heatmap {
   width: 100%;
-  min-width: 840px;
+  min-width: 880px;
   border-collapse: separate;
   border-spacing: 0;
   /*
@@ -498,15 +498,21 @@ a.news-event-name:hover {
   table-layout: fixed;
 }
 
-/* The label takes the slack; the twelve months are equal and fixed. */
+/*
+  The label takes the slack; the twelve months are equal and fixed. The split
+  is sized so the longest name the sheets write ("Fed Interest Rate Decision",
+  or with the collision fallback "Consumer Price Index (CPI YoY)") sits on one
+  line at the table's minimum — a second line grows the whole row, and every
+  cell in it outgrows its own coloured background.
+*/
 .news-heatmap thead th:first-child,
 .news-heatmap tbody th:first-child {
-  width: 22%;
+  width: 25%;
 }
 
 .news-heatmap thead th:not(:first-child),
 .news-heatmap tbody td {
-  width: 6.5%;
+  width: 6.25%;
 }
 
 .news-heatmap th {
@@ -556,8 +562,16 @@ a.news-event-name:hover {
   font-size: 11.5px;
   color: var(--color-text-dim);
   text-align: left;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  /*
+    One line, always. The longest name ("Fed Interest Rate Decision") used to
+    wrap onto a second line, growing that single row past its neighbours — and
+    the coloured cells, which are only 40px tall, then floated inside the
+    taller row with gaps above and below, colour that never touched its own
+    cell's edges. A truncated name still reads whole in the link's tooltip.
+  */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   /*
     Scrolling the twelve months sideways used to lose track of which event the
     row belonged to. The label rides along with the scroll instead.
@@ -595,10 +609,13 @@ a.news-event-name:hover {
 }
 
 /*
-  Ten pixels and three of padding — together with the 840px table minimum that
+  Ten pixels and three of padding — together with the 880px table minimum that
   leaves an eight-character delta ("−12,345K") room in the narrowest column.
   A figure clipped mid-number reads as a broken grid, which is the very thing
   the borders above are there to promise: everything lines up.
+
+  The colour comes from the cell (see below) rather than being set here, so a
+  hue on the <td> reaches the link's text through inherit.
 */
 .news-heatmap-cell {
   display: flex;
@@ -609,13 +626,9 @@ a.news-event-name:hover {
   font-family: var(--font-mono);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
-  color: var(--color-text);
+  color: inherit;
   text-decoration: none;
   overflow: hidden;
-}
-
-.news-heatmap-cell.is-empty {
-  color: var(--color-text-muted);
 }
 
 /*
@@ -623,14 +636,20 @@ a.news-event-name:hover {
   There is deliberately no intensity ramp: cells do not share a unit, so
   ranking a 2K move in claims against a 0.2% move in inflation would be
   arithmetic on the wrong quantity.
-*/
 
-.news-heatmap-cell.is-up {
+  The hue sits on the <td> for the same reason the label stays on one line:
+  the link inside is a fixed 40px band, so a background on the link alone
+  stops short of the cell's top and bottom as soon as the row is taller than
+  it — colour hanging in the middle of its own cell. On the cell it always
+  fills the box, whatever the row's height, and the link inside inherits the
+  text colour through `color: inherit`.
+*/
+.news-heatmap td.is-up {
   background: color-mix(in srgb, var(--color-green) 16%, transparent);
   color: var(--color-green);
 }
 
-.news-heatmap-cell.is-down {
+.news-heatmap td.is-down {
   background: color-mix(in srgb, var(--color-red) 16%, transparent);
   color: var(--color-red);
 }
