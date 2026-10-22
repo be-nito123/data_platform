@@ -92,7 +92,7 @@ export default async function NewsYearPage({
         <NewsWarnings warnings={archive.warnings} />
 
         <div style={{ marginTop: archive.warnings.length ? 24 : 0 }}>
-          <section>
+          <section className="news-section">
             <div className="news-section-head">
               <h2 className="news-section-title">Movement by month</h2>
               <span className="news-section-note">

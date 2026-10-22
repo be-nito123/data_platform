@@ -486,7 +486,7 @@ a.news-event-name:hover {
 
 .news-heatmap {
   width: 100%;
-  min-width: 720px;
+  min-width: 840px;
   border-collapse: separate;
   border-spacing: 0;
   /*
@@ -526,7 +526,29 @@ a.news-event-name:hover {
 
 .news-heatmap td {
   padding: 0;
-  border: 1px solid var(--color-bg);
+}
+
+/*
+  One rule draws the whole grid: a right line and a bottom line on every cell
+  — header cells, the event column and the body alike — so a line always
+  continues through all three regions instead of stopping at their edges.
+
+  The old rule gave data cells all four sides and everything else none. Under
+  `border-spacing: 0` each neighbour contributes its own pixel, so interior
+  lines came out 2px against 1px at the table's edges, the month headers had
+  no column lines above them, and the row lines began only after the event
+  name — three visible ways for the grid to disagree with itself.
+*/
+.news-heatmap th,
+.news-heatmap td {
+  border-right: 1px solid var(--color-bg);
+  border-bottom: 1px solid var(--color-bg);
+}
+
+/* The wrap already draws the right-hand edge; don't double it. */
+.news-heatmap th:last-child,
+.news-heatmap td:last-child {
+  border-right: none;
 }
 
 .news-heatmap .news-heatmap-row-label {
@@ -536,7 +558,6 @@ a.news-event-name:hover {
   text-align: left;
   white-space: normal;
   overflow-wrap: anywhere;
-  border: none;
   /*
     Scrolling the twelve months sideways used to lose track of which event the
     row belonged to. The label rides along with the scroll instead.
@@ -544,6 +565,19 @@ a.news-event-name:hover {
   position: sticky;
   left: 0;
   z-index: 1;
+  background: var(--color-panel);
+}
+
+/*
+  The heading over those labels follows them. The labels are sticky through
+  the same sideways scroll, so without this "EVENT" slid out of its own column
+  while the names beneath it stayed put — the header no longer sat above the
+  rows it headed.
+*/
+.news-heatmap thead th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
   background: var(--color-panel);
 }
 
@@ -560,14 +594,20 @@ a.news-event-name:hover {
   text-underline-offset: 2px;
 }
 
+/*
+  Ten pixels and three of padding — together with the 840px table minimum that
+  leaves an eight-character delta ("−12,345K") room in the narrowest column.
+  A figure clipped mid-number reads as a broken grid, which is the very thing
+  the borders above are there to promise: everything lines up.
+*/
 .news-heatmap-cell {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 40px;
-  padding: 6px 4px;
+  padding: 6px 3px;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
   color: var(--color-text);
   text-decoration: none;
