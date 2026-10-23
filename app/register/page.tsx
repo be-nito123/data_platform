@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [country, setCountry] = useState("");
@@ -72,38 +74,58 @@ export default function RegisterPage() {
 
               setLoading(true);
               try {
-                const supabase = createClient();
-                const { data, error } = await supabase.auth.signUp({
-                  email,
-                  password,
-                  options: {
-                    emailRedirectTo: `${window.location.origin}/login?confirmed=true`,
-                    data: {
-                      full_name: fullName,
-                      country,
-                      phone_code: phoneCode,
-                      phone_number: phoneNumber,
-                      company,
-                      job_title: jobTitle,
-                    },
-                  },
+                // Account creation goes through a server Route Handler, so the
+                // service-role key never reaches the browser and — crucially —
+                // so no email gets sent through the project's unconfigured SMTP.
+                // Accounts are created email_confirmed; the user is signed in
+                // straight away below.
+                const registerResponse = await fetch("/api/auth/register", {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({
+                    email,
+                    password,
+                    full_name: fullName,
+                    country,
+                    phone_code: phoneCode,
+                    phone_number: phoneNumber,
+                    company,
+                    job_title: jobTitle,
+                  }),
                 });
 
-                if (error) {
-                  setErrorMessage(error.message);
+                const registerResult = await registerResponse.json().catch(() => ({}));
+
+                if (!registerResponse.ok || !registerResult?.ok) {
+                  setErrorMessage(
+                    typeof registerResult?.error === "string"
+                      ? registerResult.error
+                      : "Something went wrong. Please try again."
+                  );
                   return;
                 }
 
-                if (data.user) {
-                  setSuccessMessage(
-                    data.session
-                      ? "Account created successfully. You can now access the Data Vault."
-                      : "Account created successfully. Please check your email to confirm your account."
-                  );
+                setCountry("");
+                setPhoneCode("");
 
-                  setCountry("");
-                  setPhoneCode("");
+                const supabase = createClient();
+                const { error: loginError } = await supabase.auth.signInWithPassword({
+                  email,
+                  password,
+                });
+
+                if (loginError) {
+                  setSuccessMessage(
+                    "Account created successfully. You can now sign in."
+                  );
+                  return;
                 }
+
+                setSuccessMessage("Account created successfully. Opening DataVault...");
+                setTimeout(() => {
+                  router.push("/");
+                  router.refresh();
+                }, 500);
               } catch (error) {
                 setErrorMessage(
                   error instanceof Error ? error.message : "Something went wrong. Please try again."
